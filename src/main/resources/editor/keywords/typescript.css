@@ -1,0 +1,32 @@
+.keyword {
+    -fx-fill: purple;
+    -fx-font-weight: bold;
+}
+.decorator {
+    -fx-fill: goldenrod;
+    -fx-font-weight: bold;
+}
+.semicolon {
+    -fx-fill: gray;
+}
+.paren {
+    -fx-fill: firebrick;
+    -fx-font-weight: bold;
+}
+.bracket {
+    -fx-fill: darkgreen;
+    -fx-font-weight: bold;
+}
+.brace {
+    -fx-fill: teal;
+    -fx-font-weight: bold;
+}
+.string {
+    -fx-fill: blue;
+}
+.comment {
+    -fx-fill: cadetblue;
+}
+.number {
+    -fx-fill: chocolate;
+}

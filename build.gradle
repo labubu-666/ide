@@ -1,0 +1,37 @@
+plugins {
+  id 'application'
+  id 'org.openjfx.javafxplugin' version '0.1.0'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation group: 'org.fxmisc.richtext', name: 'richtextfx', version: '0.11.7'
+    implementation 'org.jetbrains.pty4j:pty4j:0.13.4'
+    implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j:0.23.1'
+    implementation 'com.vladsch.flexmark:flexmark-all:0.64.8'
+    implementation "de.marhali:json5-java:3.0.0"
+    implementation 'org.eclipse.jgit:org.eclipse.jgit:7.6.0.202603022253-r'
+
+    testImplementation "org.testfx:testfx-core:4.0.18"
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.14.2'
+    testImplementation "org.testfx:testfx-junit5:4.0.18"
+
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'org.assertj:assertj-core:3.27.0'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+javafx {
+    version = "26.0.1"
+    modules = [ 'javafx.controls', 'javafx.web' ]
+}
+
+application {
+    mainClass = 'editor.scenes.Main'
+}

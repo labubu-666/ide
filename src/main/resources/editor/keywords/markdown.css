@@ -1,0 +1,37 @@
+.heading {
+    -fx-fill: #0550ae;
+    -fx-font-weight: bold;
+}
+.bold {
+    -fx-fill: #24292f;
+    -fx-font-weight: bold;
+}
+.italic {
+    -fx-fill: #24292f;
+    -fx-font-style: italic;
+}
+.inline-code {
+    -fx-fill: #cf222e;
+    -fx-font-family: monospace;
+}
+.code-block {
+    -fx-fill: #6e7781;
+    -fx-font-family: monospace;
+}
+.link {
+    -fx-fill: #0969da;
+}
+.image {
+    -fx-fill: #1a7f37;
+}
+.blockquote {
+    -fx-fill: #57606a;
+    -fx-font-style: italic;
+}
+.hr {
+    -fx-fill: #8c959f;
+}
+.list-item {
+    -fx-fill: #0550ae;
+    -fx-font-weight: bold;
+}

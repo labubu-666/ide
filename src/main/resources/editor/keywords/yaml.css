@@ -1,0 +1,50 @@
+.keyword {
+    -fx-fill: purple;
+    -fx-font-weight: bold;
+}
+.key {
+    -fx-fill: darkblue;
+    -fx-font-weight: bold;
+}
+.string {
+    -fx-fill: blue;
+}
+.multiline {
+    -fx-fill: darkblue;
+    -fx-font-weight: bold;
+}
+.number {
+    -fx-fill: chocolate;
+}
+.comment {
+    -fx-fill: cadetblue;
+}
+.anchor {
+    -fx-fill: darkmagenta;
+}
+.alias {
+    -fx-fill: magenta;
+}
+.tag {
+    -fx-fill: darkgoldenrod;
+}
+.document {
+    -fx-fill: gray;
+    -fx-font-weight: bold;
+}
+.list {
+    -fx-fill: firebrick;
+    -fx-font-weight: bold;
+}
+.paren {
+    -fx-fill: firebrick;
+    -fx-font-weight: bold;
+}
+.bracket {
+    -fx-fill: darkgreen;
+    -fx-font-weight: bold;
+}
+.brace {
+    -fx-fill: teal;
+    -fx-font-weight: bold;
+}

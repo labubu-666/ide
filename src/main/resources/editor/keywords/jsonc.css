@@ -1,0 +1,33 @@
+.keyword {
+    -fx-fill: purple;
+    -fx-font-weight: bold;
+}
+.key {
+    -fx-fill: darkblue;
+    -fx-font-weight: bold;
+}
+.string {
+    -fx-fill: blue;
+}
+.number {
+    -fx-fill: chocolate;
+}
+.comment {
+    -fx-fill: cadetblue;
+}
+.brace {
+    -fx-fill: teal;
+    -fx-font-weight: bold;
+}
+.bracket {
+    -fx-fill: darkgreen;
+    -fx-font-weight: bold;
+}
+.colon {
+    -fx-fill: firebrick;
+    -fx-font-weight: bold;
+}
+.comma {
+    -fx-fill: firebrick;
+    -fx-font-weight: bold;
+}
