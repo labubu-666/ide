@@ -46,6 +46,7 @@ class EditorTab extends Tab {
     Subscription cleanup;
     Subscription dirtyCleanup;
     Subscription lspCleanup;
+    Subscription previewCleanup;
     List<Diagnostic> currentDiagnostics = new ArrayList<>();
     CompletionPopup completionPopup;
     String virtualUri;
@@ -137,6 +138,18 @@ class EditorTab extends Tab {
                     ctx.docManager().didChange(filePath, codeArea.getText());
                 } else if (virtualUri != null) {
                     ctx.docManager().didChangeVirtual(virtualUri, codeArea.getText(), extension);
+                }
+            });
+
+        // Live preview: refresh preview when buffer changes (debounced)
+        previewCleanup = codeArea.multiPlainChanges()
+            .successionEnds(Duration.ofMillis(500))
+            .subscribe(changes -> {
+                // Only update if preview is available for this extension and
+                // the current view mode actually shows the preview
+                if (ctx.previewRegistry().hasPreview(extension)
+                        && (currentViewMode == ViewMode.SPLIT || currentViewMode == ViewMode.PREVIEW)) {
+                    Platform.runLater(this::refreshPreview);
                 }
             });
 
@@ -310,6 +323,7 @@ class EditorTab extends Tab {
         if (cleanup != null) cleanup.unsubscribe();
         if (dirtyCleanup != null) dirtyCleanup.unsubscribe();
         if (lspCleanup != null) lspCleanup.unsubscribe();
+        if (previewCleanup != null) previewCleanup.unsubscribe();
 
         if (virtualUri != null) {
             ctx.docManager().didCloseVirtual(virtualUri, extension);
