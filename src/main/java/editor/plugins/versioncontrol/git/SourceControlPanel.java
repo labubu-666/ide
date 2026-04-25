@@ -1,4 +1,4 @@
-package editor.plugins;
+package editor.plugins.versioncontrol.git;
 
 import java.nio.file.Path;
 import java.util.Map;
