@@ -29,7 +29,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
-import editor.GitManager;
+import managers.GitManager;
 import filetype.FileTypeRegistry;
 
 class LeftPanel extends HBox {

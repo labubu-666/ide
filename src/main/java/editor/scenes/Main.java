@@ -39,8 +39,8 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
-import editor.FileManager;
-import editor.GitManager;
+import managers.FileManager;
+import managers.GitManager;
 import editor.Settings;
 import editor.TabOperations;
 import editor.Utils;
