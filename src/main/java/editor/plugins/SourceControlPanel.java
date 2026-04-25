@@ -1,4 +1,4 @@
-package editor;
+package editor.plugins;
 
 import java.nio.file.Path;
 import java.util.Map;
@@ -8,14 +8,15 @@ import javafx.geometry.Insets;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
-import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
-import javafx.scene.control.MenuItem;
+import javafx.geometry.Pos;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TitledPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 import managers.GitManager;
@@ -25,31 +26,35 @@ import managers.GitManager;
  * Displays file changes with status indicators and provides UI for staging, unstaging,
  * and committing changes.
  */
-class SourceControlPanel extends VBox {
+import javafx.scene.control.ScrollPane;
+
+public class SourceControlPanel extends ScrollPane {
 
     private final GitManager gitManager;
     private final Consumer<Void> onRefresh;
     private ListView<FileChange> changesView;
     private ListView<FileChange> stagedView;
+    private TitledPane unstagedPane;
+    private TitledPane stagedPane;
     private TextArea messageArea;
     private Button commitButton;
     private Button amendButton;
 
     // File change record for display
-    private record FileChange(Path path, String status, boolean staged) {
+    public record FileChange(Path path, String status, boolean staged) {
         @Override
         public String toString() {
             return status + " " + path.getFileName();
         }
     }
 
-    SourceControlPanel(GitManager gitManager, Consumer<Void> onRefresh) {
+    public SourceControlPanel(GitManager gitManager, Consumer<Void> onRefresh) {
         this.gitManager = gitManager;
         this.onRefresh = onRefresh;
 
-        setSpacing(8);
-        setPadding(new Insets(8));
-        setStyle("-fx-background-color: #ffffff;");
+        VBox content = new VBox(8);
+        content.setPadding(new Insets(8));
+        content.setStyle("-fx-background-color: #ffffff;");
 
         // Initialize fields to null - will be properly initialized if this is a git repo
         this.changesView = null;
@@ -62,23 +67,22 @@ class SourceControlPanel extends VBox {
         if (!gitManager.isGitRepository()) {
             Label notGit = new Label("Not a git repository");
             notGit.setStyle("-fx-text-fill: #999; -fx-font-size: 14px;");
-            getChildren().add(notGit);
+            content.getChildren().add(notGit);
+            setContent(content);
+            setFitToWidth(true);
             return;
         }
 
-        // Unstaged changes section
-        Label unstaged = new Label("Changes");
-        unstaged.setStyle("-fx-font-size: 12px; -fx-font-weight: bold;");
-        changesView = new ListView<>();
-        changesView.setPrefHeight(150);
-        changesView.setCellFactory(lv -> createFileCell(false));
-
-        // Staged changes section
-        Label staged = new Label("Staged Changes");
-        staged.setStyle("-fx-font-size: 12px; -fx-font-weight: bold;");
-        stagedView = new ListView<>();
-        stagedView.setPrefHeight(150);
-        stagedView.setCellFactory(lv -> createFileCell(true));
+        // Header
+        HBox header = new HBox(8);
+        header.setAlignment(Pos.CENTER_LEFT);
+        Label title = new Label("Source Control");
+        title.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
+        Button refreshButton = new Button("Refresh");
+        refreshButton.setStyle("-fx-padding: 3 8 3 8; -fx-font-size: 11px;");
+        refreshButton.setOnAction(e -> refreshStatus());
+        HBox.setHgrow(refreshButton, Priority.ALWAYS);
+        header.getChildren().addAll(title, refreshButton);
 
         // Commit message section
         Label messageLabel = new Label("Commit Message");
@@ -89,42 +93,51 @@ class SourceControlPanel extends VBox {
         messageArea.setStyle("-fx-control-inner-background: #f5f5f5; -fx-font-family: 'Courier New'; -fx-font-size: 11px;");
         messageArea.setPromptText("Describe your changes...");
 
-        // Buttons
-        HBox buttonBox = new HBox(8);
-        buttonBox.setPadding(new Insets(8, 0, 0, 0));
-
-        Button refreshButton = new Button("Refresh");
-        refreshButton.setStyle("-fx-padding: 6 12 6 12; -fx-font-size: 11px;");
-        refreshButton.setOnAction(e -> refreshStatus());
-
-        Button stageAllButton = new Button("Stage All");
-        stageAllButton.setStyle("-fx-padding: 6 12 6 12; -fx-font-size: 11px;");
-        stageAllButton.setOnAction(e -> stageAll());
-
-        Button unstageAllButton = new Button("Unstage All");
-        unstageAllButton.setStyle("-fx-padding: 6 12 6 12; -fx-font-size: 11px;");
-        unstageAllButton.setOnAction(e -> unstageAll());
-
+        // Commit and Amend buttons
+        HBox commitButtonBox = new HBox(8);
+        commitButtonBox.setPadding(new Insets(8, 0, 0, 0));
         commitButton = new Button("Commit");
         commitButton.setStyle("-fx-padding: 6 12 6 12; -fx-font-size: 11px; -fx-text-fill: #ffffff; -fx-background-color: #007acc;");
         commitButton.setOnAction(e -> commit());
-
         amendButton = new Button("Amend");
         amendButton.setStyle("-fx-padding: 6 12 6 12; -fx-font-size: 11px;");
         amendButton.setOnAction(e -> amend());
+        commitButtonBox.getChildren().addAll(commitButton, amendButton);
 
-        buttonBox.getChildren().addAll(refreshButton, stageAllButton, unstageAllButton, commitButton, amendButton);
+        // Unstaged changes section
+        unstagedPane = new TitledPane();
+        unstagedPane.setText("Changes");
+        unstagedPane.setCollapsible(true);
+        unstagedPane.setExpanded(true);
+        changesView = new ListView<>();
+        changesView.setPrefHeight(150);
+        changesView.setCellFactory(lv -> createFileCell(false));
+        unstagedPane.setContent(changesView);
 
-        getChildren().addAll(
-            unstaged, changesView,
-            staged, stagedView,
+        // Staged changes section
+        stagedPane = new TitledPane();
+        stagedPane.setText("Staged Changes");
+        stagedPane.setCollapsible(true);
+        stagedPane.setExpanded(true);
+        stagedView = new ListView<>();
+        stagedView.setPrefHeight(150);
+        stagedView.setCellFactory(lv -> createFileCell(true));
+        stagedPane.setContent(stagedView);
+
+        content.getChildren().addAll(
+            header,
             messageLabel, messageArea,
-            buttonBox
+            commitButtonBox,
+            unstagedPane,
+            stagedPane
         );
 
         VBox.setVgrow(changesView, Priority.SOMETIMES);
         VBox.setVgrow(stagedView, Priority.SOMETIMES);
         VBox.setVgrow(messageArea, Priority.SOMETIMES);
+
+        setContent(content);
+        setFitToWidth(true);
 
         // Initial load
         refreshStatus();
@@ -141,11 +154,17 @@ class SourceControlPanel extends VBox {
         for (Map.Entry<Path, String> entry : unstaged.entrySet()) {
             changesView.getItems().add(new FileChange(entry.getKey(), entry.getValue(), false));
         }
+        // Hide/show unstaged changes section
+        unstagedPane.setVisible(!unstaged.isEmpty());
+        unstagedPane.setManaged(!unstaged.isEmpty());
 
         stagedView.getItems().clear();
         for (Map.Entry<Path, String> entry : staged.entrySet()) {
             stagedView.getItems().add(new FileChange(entry.getKey(), entry.getValue(), true));
         }
+        // Hide/show staged changes section
+        stagedPane.setVisible(!staged.isEmpty());
+        stagedPane.setManaged(!staged.isEmpty());
     }
 
     /**
@@ -159,13 +178,12 @@ class SourceControlPanel extends VBox {
                 if (empty || item == null) {
                     setText(null);
                     setGraphic(null);
-                    setContextMenu(null);
                     return;
                 }
 
-                // Create display with status indicator
                 HBox box = new HBox(8);
                 box.setPadding(new Insets(4, 8, 4, 8));
+                box.setAlignment(Pos.CENTER_LEFT);
 
                 Label statusLabel = new Label(item.status);
                 statusLabel.setPrefWidth(30);
@@ -183,30 +201,24 @@ class SourceControlPanel extends VBox {
                 VBox details = new VBox(0);
                 details.getChildren().addAll(fileLabel, pathLabel);
 
-                box.getChildren().addAll(statusLabel, details);
-                HBox.setHgrow(details, Priority.ALWAYS);
-                setGraphic(box);
-
-                // Context menu for individual file actions
-                ContextMenu menu = new ContextMenu();
-                if (isStaged) {
-                    MenuItem unstageItem = new MenuItem("Unstage");
-                    unstageItem.setOnAction(e -> {
+                // Add/Remove button
+                Button actionButton = new Button(isStaged ? "Remove" : "Add");
+                actionButton.setStyle("-fx-padding: 2 5 2 5; -fx-font-size: 10px;");
+                actionButton.setOnAction(e -> {
+                    if (isStaged) {
                         gitManager.unstageFile(item.path);
-                        refreshStatus();
-                        if (onRefresh != null) onRefresh.accept(null);
-                    });
-                    menu.getItems().add(unstageItem);
-                } else {
-                    MenuItem stageItem = new MenuItem("Stage");
-                    stageItem.setOnAction(e -> {
+                    } else {
                         gitManager.stageFile(item.path);
-                        refreshStatus();
-                        if (onRefresh != null) onRefresh.accept(null);
-                    });
-                    menu.getItems().add(stageItem);
-                }
-                setContextMenu(menu);
+                    }
+                    refreshStatus();
+                    if (onRefresh != null) onRefresh.accept(null);
+                });
+
+                Region spacer = new Region();
+                HBox.setHgrow(spacer, Priority.ALWAYS);
+
+                box.getChildren().addAll(statusLabel, details, spacer, actionButton);
+                setGraphic(box);
             }
         };
     }
@@ -224,24 +236,6 @@ class SourceControlPanel extends VBox {
             case "C" -> "-fx-text-fill: #f44336; -fx-font-weight: bold; -fx-font-size: 12px;"; // Conflicting - Red bold
             default -> "-fx-text-fill: #666666; -fx-font-size: 11px;";
         };
-    }
-
-    private void stageAll() {
-        if (gitManager.stageAll()) {
-            refreshStatus();
-            if (onRefresh != null) onRefresh.accept(null);
-        } else {
-            new Alert(AlertType.ERROR, "Failed to stage all changes").showAndWait();
-        }
-    }
-
-    private void unstageAll() {
-        if (gitManager.unstageAll()) {
-            refreshStatus();
-            if (onRefresh != null) onRefresh.accept(null);
-        } else {
-            new Alert(AlertType.ERROR, "Failed to unstage all changes").showAndWait();
-        }
     }
 
     private void commit() {
