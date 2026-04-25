@@ -41,7 +41,7 @@ import javafx.stage.Stage;
 
 import managers.FileManager;
 import managers.GitManager;
-import editor.Settings;
+import settings.Settings;
 import editor.TabOperations;
 import editor.Utils;
 import filetype.FileTypeRegistry;
@@ -50,6 +50,7 @@ import lsp.CompletionProvider;
 import lsp.DocumentManager;
 import lsp.LspServerRegistry;
 import preview.PreviewRegistry;
+import settings.SettingsDialog;
 
 public class Main extends Application {
 

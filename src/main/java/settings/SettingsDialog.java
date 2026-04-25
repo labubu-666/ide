@@ -1,11 +1,10 @@
-package editor.scenes;
+package settings;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.util.stream.Collectors;
 
-import editor.Settings;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;

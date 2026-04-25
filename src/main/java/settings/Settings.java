@@ -1,4 +1,4 @@
-package editor;
+package settings;
 
 import de.marhali.json5.Json5;
 import de.marhali.json5.Json5Element;
