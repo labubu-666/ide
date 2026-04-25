@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -20,6 +22,9 @@ import org.junit.jupiter.api.Test;
  * Tests git repository detection and branch information retrieval.
  */
 public class GitManagerTest {
+
+    private Path repo;
+    private GitManager manager;
 
     /**
      * Create a temporary git repository for testing.
@@ -77,74 +82,63 @@ public class GitManagerTest {
         }
     }
 
+    @BeforeEach
+    public void setUp() throws Exception {
+        repo = createTempGitRepository();
+        manager = new GitManager(repo);
+    }
+
+    @AfterEach
+    public void tearDown() throws Exception {
+        if (manager != null) {
+            manager.close();
+        }
+        deleteDirectoryRecursively(repo);
+    }
+
     /**
      * Test that GitManager correctly detects a git repository.
      * Uses the current working directory which is a git repo.
      */
     @Test
-    public void testDetectGitRepository() throws Exception {
-        Path repo = createTempGitRepository();
-        try {
-            GitManager manager = new GitManager(repo);
-
-            assertThat(manager.isGitRepository()).as("Temp directory should be detected as a git repository").isTrue();
-            manager.close();
-        } finally {
-            deleteDirectoryRecursively(repo);
-        }
+    public void testDetectGitRepository() {
+        assertThat(manager.isGitRepository()).as("Temp directory should be detected as a git repository").isTrue();
     }
 
     /**
      * Test that GitManager can retrieve the current branch name.
      */
     @Test
-    public void testGetCurrentBranch() throws Exception {
-        Path repo = createTempGitRepository();
-        try {
-            GitManager manager = new GitManager(repo);
+    public void testGetCurrentBranch() {
+        assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
+        assertThat(manager.getCurrentBranch().isPresent()).as("Should return a branch name").isTrue();
 
-            assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
-            assertThat(manager.getCurrentBranch().isPresent()).as("Should return a branch name").isTrue();
+        String branch = manager.getCurrentBranch().get();
+        assertThat(branch.isEmpty()).as("Branch name should not be empty").isFalse();
 
-            String branch = manager.getCurrentBranch().get();
-            assertThat(branch.isEmpty()).as("Branch name should not be empty").isFalse();
-
-            // Do not hardcode branch name (may be 'main' or 'master' or other).
-            // Just ensure it is non-empty and represents the repository branch.
-            assertThat(branch).as("Branch name should be a non-empty string").isNotEmpty();
-
-            manager.close();
-        } finally {
-            deleteDirectoryRecursively(repo);
-        }
+        // Do not hardcode branch name (may be 'main' or 'master' or other).
+        // Just ensure it is non-empty and represents the repository branch.
+        assertThat(branch).as("Branch name should be a non-empty string").isNotEmpty();
     }
 
     /**
      * Test that getDisplayString returns appropriate values.
      */
     @Test
-    public void testGetDisplayString() throws Exception {
-        Path repo = createTempGitRepository();
-        try {
-            GitManager manager = new GitManager(repo);
+    public void testGetDisplayString() {
+        String displayString = manager.getDisplayString();
+        assertThat(displayString.isEmpty()).as("Display string should not be empty").isFalse();
 
-            String displayString = manager.getDisplayString();
-            assertThat(displayString.isEmpty()).as("Display string should not be empty").isFalse();
-
-            if (manager.isGitRepository()) {
-                // Display string should reflect the current branch (may vary across environments)
-                String expected = manager.getCurrentBranch().orElse("");
-                assertThat(displayString).as("Display string should show branch name when in git repo").isEqualTo(expected);
-            }
-
-            manager.close();
-        } finally {
-            deleteDirectoryRecursively(repo);
+        if (manager.isGitRepository()) {
+            // Display string should reflect the current branch (may vary across environments)
+            String expected = manager.getCurrentBranch().orElse("");
+            assertThat(displayString).as("Display string should show branch name when in git repo").isEqualTo(expected);
         }
     }
 
     /**
      * Test that GitManager handles non-git directories gracefully.
+     * This test uses its own setup/teardown since it requires a non-git directory.
      */
     @Test
     public void testNonGitDirectory() throws Exception {
@@ -152,18 +146,18 @@ public class GitManagerTest {
         Path tempDir = Files.createTempDirectory("non-git-test");
         
         try {
-            GitManager manager = new GitManager(tempDir);
+            GitManager tempManager = new GitManager(tempDir);
             
-            assertThat(manager.isGitRepository()).as("Temporary directory should not be detected as git repo").isFalse();
+            assertThat(tempManager.isGitRepository()).as("Temporary directory should not be detected as git repo").isFalse();
             
             // getCurrentBranch should return empty Optional
-            assertThat(manager.getCurrentBranch().isPresent()).as("Should return empty optional for non-git directory").isFalse();
+            assertThat(tempManager.getCurrentBranch().isPresent()).as("Should return empty optional for non-git directory").isFalse();
             
             // getDisplayString should return empty string for non-git directory
-            String displayString = manager.getDisplayString();
+            String displayString = tempManager.getDisplayString();
             assertThat(displayString).as("Should return empty string for non-git directory").isEqualTo("");
             
-            manager.close();
+            tempManager.close();
         } finally {
             // Cleanup
             Files.deleteIfExists(tempDir);
@@ -177,50 +171,42 @@ public class GitManagerTest {
      */
     @Test
     public void testStageUnstageWithRelativePaths() throws Exception {
-        Path repo = createTempGitRepository();
+        assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
+
+        // Create a test file
+        Path testFile = repo.resolve("test-relative-path-file.txt");
+        Path relativePath = Paths.get("test-relative-path-file.txt");
+
         try {
-            GitManager manager = new GitManager(repo);
+            Files.writeString(testFile, "test content for relative path test");
 
-            assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
+            // File should appear in unstaged changes with relative path
+            var unstagedChanges = manager.getUnstagedChanges();
+            assertThat(unstagedChanges.containsKey(relativePath)).as("New file should appear in unstaged changes with relative path").isTrue();
 
-            // Create a test file
-            Path testFile = repo.resolve("test-relative-path-file.txt");
-            Path relativePath = Paths.get("test-relative-path-file.txt");
+            // Stage the file using the RELATIVE path (simulating what SourceControlPanel does)
+            assertThat(manager.stageFile(relativePath)).as("Should be able to stage file using relative path").isTrue();
 
-            try {
-                Files.writeString(testFile, "test content for relative path test");
+            // Verify file is now staged
+            var stagedChanges = manager.getStagedChanges();
+            unstagedChanges = manager.getUnstagedChanges();
 
-                // File should appear in unstaged changes with relative path
-                var unstagedChanges = manager.getUnstagedChanges();
-                assertThat(unstagedChanges.containsKey(relativePath)).as("New file should appear in unstaged changes with relative path").isTrue();
+            assertThat(unstagedChanges.containsKey(relativePath)).as("File should not be in unstaged changes after staging with relative path").isFalse();
+            assertThat(stagedChanges.containsKey(relativePath)).as("File should be in staged changes after staging with relative path").isTrue();
 
-                // Stage the file using the RELATIVE path (simulating what SourceControlPanel does)
-                assertThat(manager.stageFile(relativePath)).as("Should be able to stage file using relative path").isTrue();
+            // Unstage using relative path
+            assertThat(manager.unstageFile(relativePath)).as("Should be able to unstage file using relative path").isTrue();
 
-                // Verify file is now staged
-                var stagedChanges = manager.getStagedChanges();
-                unstagedChanges = manager.getUnstagedChanges();
+            // Verify file is back in unstaged
+            unstagedChanges = manager.getUnstagedChanges();
+            stagedChanges = manager.getStagedChanges();
 
-                assertThat(unstagedChanges.containsKey(relativePath)).as("File should not be in unstaged changes after staging with relative path").isFalse();
-                assertThat(stagedChanges.containsKey(relativePath)).as("File should be in staged changes after staging with relative path").isTrue();
+            assertThat(unstagedChanges.containsKey(relativePath)).as("File should be back in unstaged changes after unstaging with relative path").isTrue();
+            assertThat(stagedChanges.containsKey(relativePath)).as("File should not be in staged changes after unstaging with relative path").isFalse();
 
-                // Unstage using relative path
-                assertThat(manager.unstageFile(relativePath)).as("Should be able to unstage file using relative path").isTrue();
-
-                // Verify file is back in unstaged
-                unstagedChanges = manager.getUnstagedChanges();
-                stagedChanges = manager.getStagedChanges();
-
-                assertThat(unstagedChanges.containsKey(relativePath)).as("File should be back in unstaged changes after unstaging with relative path").isTrue();
-                assertThat(stagedChanges.containsKey(relativePath)).as("File should not be in staged changes after unstaging with relative path").isFalse();
-
-            } finally {
-                // Cleanup
-                Files.deleteIfExists(testFile);
-                manager.close();
-            }
         } finally {
-            deleteDirectoryRecursively(repo);
+            // Cleanup
+            Files.deleteIfExists(testFile);
         }
     }
 
@@ -229,49 +215,90 @@ public class GitManagerTest {
      */
     @Test
     public void testGetUnstagedChanges() throws Exception {
-        Path repo = createTempGitRepository();
+        assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
+
+        // Create a test file
+        Path testFile = repo.resolve("test-unstaged-file.txt");
         try {
-            GitManager manager = new GitManager(repo);
+            Files.writeString(testFile, "test content");
 
-            assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
+            // File should appear in unstaged changes as untracked
+            var unstagedChanges = manager.getUnstagedChanges();
+            Path relativeTestFile = Paths.get("test-unstaged-file.txt");
 
-            // Create a test file
-            Path testFile = repo.resolve("test-unstaged-file.txt");
-            try {
-                Files.writeString(testFile, "test content");
+            assertThat(unstagedChanges.containsKey(relativeTestFile)).as("New file should appear in unstaged changes. Found: %s", unstagedChanges.keySet()).isTrue();
+            assertThat(unstagedChanges.get(relativeTestFile)).as("New file should have status 'U' (untracked)").isEqualTo("U");
 
-                // File should appear in unstaged changes as untracked
-                var unstagedChanges = manager.getUnstagedChanges();
-                Path relativeTestFile = Paths.get("test-unstaged-file.txt");
+            // Stage the file
+            assertThat(manager.stageFile(testFile)).as("Should be able to stage the test file").isTrue();
 
-                assertThat(unstagedChanges.containsKey(relativeTestFile)).as("New file should appear in unstaged changes. Found: %s", unstagedChanges.keySet()).isTrue();
-                assertThat(unstagedChanges.get(relativeTestFile)).as("New file should have status 'U' (untracked)").isEqualTo("U");
+            // File should now be in staged changes, not unstaged
+            var stagedChanges = manager.getStagedChanges();
+            unstagedChanges = manager.getUnstagedChanges();
 
-                // Stage the file
-                assertThat(manager.stageFile(testFile)).as("Should be able to stage the test file").isTrue();
+            assertThat(unstagedChanges.containsKey(relativeTestFile)).as("Staged file should not appear in unstaged changes").isFalse();
+            assertThat(stagedChanges.containsKey(relativeTestFile)).as("Staged file should appear in staged changes. Found: %s", stagedChanges.keySet()).isTrue();
+            assertThat(stagedChanges.get(relativeTestFile)).as("Staged new file should have status 'A' (added)").isEqualTo("A");
 
-                // File should now be in staged changes, not unstaged
-                var stagedChanges = manager.getStagedChanges();
-                unstagedChanges = manager.getUnstagedChanges();
+            // Unstage the file
+            assertThat(manager.unstageFile(testFile)).as("Should be able to unstage the test file").isTrue();
 
-                assertThat(unstagedChanges.containsKey(relativeTestFile)).as("Staged file should not appear in unstaged changes").isFalse();
-                assertThat(stagedChanges.containsKey(relativeTestFile)).as("Staged file should appear in staged changes. Found: %s", stagedChanges.keySet()).isTrue();
-                assertThat(stagedChanges.get(relativeTestFile)).as("Staged new file should have status 'A' (added)").isEqualTo("A");
+            // File should be back in unstaged changes
+            unstagedChanges = manager.getUnstagedChanges();
+            assertThat(unstagedChanges.containsKey(relativeTestFile)).as("Unstaged file should appear back in unstaged changes").isTrue();
 
-                // Unstage the file
-                assertThat(manager.unstageFile(testFile)).as("Should be able to unstage the test file").isTrue();
-
-                // File should be back in unstaged changes
-                unstagedChanges = manager.getUnstagedChanges();
-                assertThat(unstagedChanges.containsKey(relativeTestFile)).as("Unstaged file should appear back in unstaged changes").isTrue();
-
-            } finally {
-                // Cleanup - delete test file
-                Files.deleteIfExists(testFile);
-                manager.close();
-            }
         } finally {
-            deleteDirectoryRecursively(repo);
+            // Cleanup - delete test file
+            Files.deleteIfExists(testFile);
+        }
+    }
+
+    /**
+     * Test hasStagedChanges returns correct values.
+     */
+    @Test
+    public void testHasStagedChanges() throws Exception {
+        assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
+        assertThat(manager.hasStagedChanges()).as("New repo should have no staged changes").isFalse();
+        
+        // Create and stage a file
+        Path testFile = repo.resolve("test-staged.txt");
+        try {
+            Files.writeString(testFile, "test content");
+            manager.stageFile(testFile);
+            
+            assertThat(manager.hasStagedChanges()).as("Should have staged changes after staging file").isTrue();
+            
+            // Unstage the file
+            manager.unstageFile(testFile);
+            assertThat(manager.hasStagedChanges()).as("Should have no staged changes after unstaging").isFalse();
+            
+        } finally {
+            Files.deleteIfExists(testFile);
+        }
+    }
+
+    /**
+     * Test hasUnstagedChanges returns correct values.
+     */
+    @Test
+    public void testHasUnstagedChanges() throws Exception {
+        assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
+        assertThat(manager.hasUnstagedChanges()).as("New repo should have no unstaged changes").isFalse();
+        
+        // Create a new file (unstaged)
+        Path testFile = repo.resolve("test-unstaged.txt");
+        try {
+            Files.writeString(testFile, "test content");
+            
+            assertThat(manager.hasUnstagedChanges()).as("Should have unstaged changes with new file").isTrue();
+            
+            // Stage the file
+            manager.stageFile(testFile);
+            assertThat(manager.hasUnstagedChanges()).as("Should have no unstaged changes after staging").isFalse();
+            
+        } finally {
+            Files.deleteIfExists(testFile);
         }
     }
 }
