@@ -25,12 +25,14 @@ public class GitManager {
     private Repository repository;
     private boolean isGitRepo;
     private Git git;
+    private GitStatusWatcher watcher;
 
     public GitManager(Path rootPath) {
         this.rootPath = rootPath;
         this.isGitRepo = false;
         try {
             initializeRepository();
+            initializeWatcher();
         } catch (IOException e) {
             // Not a git repository or error accessing it
             this.repository = null;
@@ -51,6 +53,31 @@ public class GitManager {
             isGitRepo = true;
             this.git = new Git(repository);
         }
+    }
+
+    /**
+     * Initializes the file system watcher for git changes.
+     */
+    private void initializeWatcher() throws IOException {
+        if (!isGitRepo || repository == null) {
+            return;
+        }
+        
+        File gitDir = repository.getDirectory();
+        if (gitDir != null && gitDir.exists()) {
+            watcher = new GitStatusWatcher(gitDir.toPath(), rootPath);
+            watcher.start();
+            System.out.println("[Git] File system watcher started");
+        }
+    }
+
+    /**
+     * Gets the git status watcher if available.
+     * 
+     * @return the GitStatusWatcher, or null if not in a git repository
+     */
+    public GitStatusWatcher getWatcher() {
+        return watcher;
     }
 
     /**
@@ -362,6 +389,9 @@ public class GitManager {
      * Closes the repository and releases resources.
      */
     public void close() {
+        if (watcher != null) {
+            watcher.stop();
+        }
         if (git != null) {
             git.close();
         }
