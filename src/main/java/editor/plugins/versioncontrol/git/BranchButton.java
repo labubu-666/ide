@@ -67,9 +67,10 @@ public class BranchButton extends Button {
         
         setGraphic(buttonContent);
         
-        // Button action - could be extended to show git log or open source control panel
+        // Button action - opens the branches dialog
         setOnAction(e -> {
-            // Future: Open source control panel or show git log
+            BranchesDialog dialog = new BranchesDialog(getScene().getWindow(), gitManager, v -> refresh());
+            dialog.show();
         });
         
         // Subscribe to file system changes to auto-refresh
