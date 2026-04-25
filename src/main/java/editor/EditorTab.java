@@ -1,4 +1,4 @@
-package editor.scenes;
+package editor;
 
 import java.nio.file.Path;
 import java.time.Duration;
