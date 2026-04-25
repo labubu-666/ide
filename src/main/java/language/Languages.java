@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import editor.Settings;
+import settings.Settings;
 import styler.CssStyler;
 import styler.JavaStyler;
 import styler.JsonStyler;
