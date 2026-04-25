@@ -129,6 +129,9 @@ public class SourceControlPanel extends ScrollPane {
             setFitToWidth(true);
             return;
         }
+        
+        // Subscribe to file system changes for auto-refresh
+        subscribeToGitChanges();
 
         // Header
         Header header = new Header();
@@ -191,6 +194,22 @@ public class SourceControlPanel extends ScrollPane {
 
         // Initial load
         refreshStatus();
+    }
+
+    /**
+     * Subscribes to git file system changes to automatically refresh the panel.
+     */
+    private void subscribeToGitChanges() {
+        managers.GitStatusWatcher watcher = gitManager.getWatcher();
+        if (watcher != null) {
+            watcher.addListener(changeType -> {
+                // Refresh on any git change
+                refreshStatus();
+                if (onRefresh != null) {
+                    onRefresh.accept(null);
+                }
+            });
+        }
     }
 
     /**

@@ -462,6 +462,11 @@ public class Main extends Application {
             System.err.println("[Main] Error during LSP shutdown: " + e.getMessage());
         }
 
+        System.err.println("[Main] Closing git manager and file watcher...");
+        if (gitManager != null) {
+            gitManager.close();
+        }
+
         System.err.println("[Main] Shutting down executor service...");
         executor.shutdown();
         try {

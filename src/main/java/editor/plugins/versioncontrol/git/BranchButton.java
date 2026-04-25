@@ -71,6 +71,22 @@ public class BranchButton extends Button {
         setOnAction(e -> {
             // Future: Open source control panel or show git log
         });
+        
+        // Subscribe to file system changes to auto-refresh
+        subscribeToGitChanges();
+    }
+    
+    /**
+     * Subscribes to git file system changes to automatically refresh the button.
+     */
+    private void subscribeToGitChanges() {
+        managers.GitStatusWatcher watcher = gitManager.getWatcher();
+        if (watcher != null) {
+            watcher.addListener(changeType -> {
+                // Refresh on any git change
+                refresh();
+            });
+        }
     }
     
     /**
