@@ -301,4 +301,153 @@ public class GitManagerTest {
             Files.deleteIfExists(testFile);
         }
     }
+
+    /**
+     * Test getBranches returns list of branches.
+     */
+    @Test
+    public void testGetBranches() {
+        assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
+        
+        List<String> branches = manager.getBranches();
+        assertThat(branches).as("Should return at least one branch").isNotEmpty();
+        
+        // Initial branch should be present (main or master)
+        assertThat(branches).as("Should contain the initial branch").hasSize(1);
+    }
+
+    /**
+     * Test creating a new branch.
+     */
+    @Test
+    public void testCreateBranch() {
+        assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
+        
+        String newBranchName = "feature-test";
+        boolean result = manager.createBranch(newBranchName);
+        assertThat(result).as("Should successfully create branch").isTrue();
+        
+        List<String> branches = manager.getBranches();
+        assertThat(branches).as("Should contain the new branch").contains(newBranchName);
+    }
+
+    /**
+     * Test creating a branch with empty name should fail.
+     */
+    @Test
+    public void testCreateBranchWithEmptyName() {
+        assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
+        
+        boolean result = manager.createBranch("");
+        assertThat(result).as("Should fail to create branch with empty name").isFalse();
+        
+        result = manager.createBranch("   ");
+        assertThat(result).as("Should fail to create branch with whitespace name").isFalse();
+    }
+
+    /**
+     * Test checking out a branch.
+     */
+    @Test
+    public void testCheckoutBranch() {
+        assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
+        
+        // Create a new branch and check it out
+        String newBranchName = "feature-checkout";
+        manager.createBranch(newBranchName);
+        
+        boolean result = manager.checkoutBranch(newBranchName);
+        assertThat(result).as("Should successfully checkout branch").isTrue();
+        
+        assertThat(manager.getCurrentBranch()).as("Current branch should be the new branch")
+            .isPresent()
+            .hasValue(newBranchName);
+    }
+
+    /**
+     * Test creating and checking out a branch in one operation.
+     */
+    @Test
+    public void testCreateAndCheckoutBranch() {
+        assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
+        
+        String currentBranch = manager.getCurrentBranch().orElse("");
+        String newBranchName = "feature-create-checkout";
+        
+        boolean result = manager.createAndCheckoutBranch(newBranchName);
+        assertThat(result).as("Should successfully create and checkout branch").isTrue();
+        
+        assertThat(manager.getCurrentBranch()).as("Current branch should be the new branch")
+            .isPresent()
+            .hasValue(newBranchName);
+        
+        List<String> branches = manager.getBranches();
+        assertThat(branches).as("Should contain both branches").contains(currentBranch, newBranchName);
+    }
+
+    /**
+     * Test creating a branch from another branch.
+     */
+    @Test
+    public void testCreateBranchFrom() throws Exception {
+        assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
+        
+        String currentBranch = manager.getCurrentBranch().orElse("");
+        
+        // Create a file and commit on current branch
+        Path testFile = repo.resolve("base-branch-file.txt");
+        Files.writeString(testFile, "content on base branch");
+        manager.stageFile(testFile);
+        manager.commit("Add file on base branch");
+        
+        // Create a new branch from current branch
+        String newBranchName = "feature-from-base";
+        boolean result = manager.createBranchFrom(newBranchName, currentBranch);
+        assertThat(result).as("Should successfully create branch from base").isTrue();
+        
+        assertThat(manager.getCurrentBranch()).as("Should be on the new branch")
+            .isPresent()
+            .hasValue(newBranchName);
+        
+        // The file should exist on the new branch
+        assertThat(Files.exists(testFile)).as("File from base branch should exist").isTrue();
+    }
+
+    /**
+     * Test deleting a branch.
+     */
+    @Test
+    public void testDeleteBranch() {
+        assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
+        
+        // Create and switch to a new branch
+        String branchToDelete = "feature-to-delete";
+        manager.createBranch(branchToDelete);
+        
+        // Switch back to main/master to delete the feature branch
+        String currentBranch = manager.getCurrentBranch().orElse("");
+        manager.checkoutBranch(currentBranch);
+        
+        boolean result = manager.deleteBranch(branchToDelete);
+        assertThat(result).as("Should successfully delete branch").isTrue();
+        
+        List<String> branches = manager.getBranches();
+        assertThat(branches).as("Should not contain deleted branch").doesNotContain(branchToDelete);
+    }
+
+    /**
+     * Test that deleting the current branch should fail.
+     */
+    @Test
+    public void testDeleteCurrentBranch() {
+        assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
+        
+        String currentBranch = manager.getCurrentBranch().orElse("");
+        
+        boolean result = manager.deleteBranch(currentBranch);
+        assertThat(result).as("Should fail to delete current branch").isFalse();
+        
+        List<String> branches = manager.getBranches();
+        assertThat(branches).as("Current branch should still exist").contains(currentBranch);
+    }
 }

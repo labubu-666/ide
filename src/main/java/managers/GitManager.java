@@ -4,13 +4,16 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -383,6 +386,143 @@ public class GitManager {
      */
     public boolean hasUnstagedChanges() {
         return !getUnstagedChanges().isEmpty();
+    }
+
+    /**
+     * Gets a list of all local branch names.
+     *
+     * @return List of branch names, or empty list if not a git repo
+     */
+    public List<String> getBranches() {
+        if (!isGitRepo || git == null) {
+            return Collections.emptyList();
+        }
+
+        try {
+            List<Ref> branches = git.branchList().call();
+            List<String> branchNames = new ArrayList<>();
+            for (Ref branch : branches) {
+                String name = branch.getName();
+                // Strip refs/heads/ prefix
+                if (name.startsWith("refs/heads/")) {
+                    name = name.substring("refs/heads/".length());
+                }
+                branchNames.add(name);
+            }
+            return branchNames;
+        } catch (GitAPIException e) {
+            System.err.println("[Git] Error getting branches: " + e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Creates a new branch.
+     *
+     * @param branchName name of the branch to create
+     * @return true if successful, false otherwise
+     */
+    public boolean createBranch(String branchName) {
+        if (!isGitRepo || git == null || branchName == null || branchName.trim().isEmpty()) {
+            return false;
+        }
+
+        try {
+            git.branchCreate().setName(branchName).call();
+            return true;
+        } catch (GitAPIException e) {
+            System.err.println("[Git] Error creating branch: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Checks out an existing branch.
+     *
+     * @param branchName name of the branch to checkout
+     * @return true if successful, false otherwise
+     */
+    public boolean checkoutBranch(String branchName) {
+        if (!isGitRepo || git == null || branchName == null || branchName.trim().isEmpty()) {
+            return false;
+        }
+
+        try {
+            git.checkout().setName(branchName).call();
+            return true;
+        } catch (GitAPIException e) {
+            System.err.println("[Git] Error checking out branch: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Creates a new branch and checks it out.
+     *
+     * @param branchName name of the branch to create and checkout
+     * @return true if successful, false otherwise
+     */
+    public boolean createAndCheckoutBranch(String branchName) {
+        if (!isGitRepo || git == null || branchName == null || branchName.trim().isEmpty()) {
+            return false;
+        }
+
+        try {
+            git.checkout().setCreateBranch(true).setName(branchName).call();
+            return true;
+        } catch (GitAPIException e) {
+            System.err.println("[Git] Error creating and checking out branch: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Creates a new branch from a specified base branch and checks it out.
+     *
+     * @param branchName name of the branch to create
+     * @param baseBranch name of the branch to create from
+     * @return true if successful, false otherwise
+     */
+    public boolean createBranchFrom(String branchName, String baseBranch) {
+        if (!isGitRepo || git == null || branchName == null || branchName.trim().isEmpty() 
+                || baseBranch == null || baseBranch.trim().isEmpty()) {
+            return false;
+        }
+
+        try {
+            git.checkout().setCreateBranch(true).setName(branchName).setStartPoint(baseBranch).call();
+            return true;
+        } catch (GitAPIException e) {
+            System.err.println("[Git] Error creating branch from " + baseBranch + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Deletes a branch.
+     *
+     * @param branchName name of the branch to delete
+     * @return true if successful, false otherwise
+     */
+    public boolean deleteBranch(String branchName) {
+        if (!isGitRepo || git == null || branchName == null || branchName.trim().isEmpty()) {
+            return false;
+        }
+
+        // Prevent deleting the current branch
+        Optional<String> currentBranch = getCurrentBranch();
+        if (currentBranch.isPresent() && currentBranch.get().equals(branchName)) {
+            System.err.println("[Git] Cannot delete the current branch: " + branchName);
+            return false;
+        }
+
+        try {
+            git.branchDelete().setBranchNames(branchName).setForce(false).call();
+            return true;
+        } catch (GitAPIException e) {
+            System.err.println("[Git] Error deleting branch: " + e.getMessage());
+            return false;
+        }
     }
 
     /**
