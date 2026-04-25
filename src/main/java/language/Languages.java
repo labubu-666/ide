@@ -64,7 +64,7 @@ public final class Languages {
         ),
         new Language(
             "Markdown", List.of("md", "markdown"), DEFAULT_ICON, "markdown",
-            null,
+            () -> Arrays.asList(Settings.get(Settings.SettingKey.MARKDOWN_SERVER_PATH).split("\\s+")),
             text -> new MarkdownStyler(text).style(),
             "/editor/keywords/markdown.css"
         ),

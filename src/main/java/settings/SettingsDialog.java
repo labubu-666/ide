@@ -37,6 +37,8 @@ public class SettingsDialog {
     private final TextArea yamlServerOutputArea;
     private final TextField jsonServerField;
     private final TextArea jsonServerOutputArea;
+    private final TextField markdownServerField;
+    private final TextArea markdownServerOutputArea;
 
     public SettingsDialog(Window owner) {
         stage = new Stage();
@@ -203,7 +205,34 @@ public class SettingsDialog {
                  jsonServerOutputArea);
          jsonContent.setPadding(new Insets(12));
 
-         // --- SDK tab: contains Python, TypeScript, SASS, YAML, and JSON nested tabs ---
+         // --- Markdown tab content ---
+         Label markdownServerLabel = new Label("Language server command:");
+
+         markdownServerField = new TextField(Settings.get(Settings.SettingKey.MARKDOWN_SERVER_PATH));
+         HBox.setHgrow(markdownServerField, Priority.ALWAYS);
+
+         Button browseMarkdownBtn = new Button("Browse...");
+         browseMarkdownBtn.setOnAction(e -> browse("Select markdown language server", markdownServerField));
+
+         HBox markdownServerRow = new HBox(8, markdownServerField, browseMarkdownBtn);
+
+         markdownServerOutputArea = new TextArea();
+         markdownServerOutputArea.setEditable(false);
+         markdownServerOutputArea.setWrapText(true);
+         markdownServerOutputArea.setPrefRowCount(2);
+         markdownServerOutputArea.setStyle("-fx-font-family: monospace; -fx-font-size: 12px;");
+
+         Button testMarkdownBtn = new Button("Test");
+         testMarkdownBtn.setOnAction(e -> testCommand(markdownServerField, markdownServerOutputArea));
+
+         VBox markdownContent = new VBox(6,
+                 markdownServerLabel,
+                 markdownServerRow,
+                 testMarkdownBtn,
+                 markdownServerOutputArea);
+         markdownContent.setPadding(new Insets(12));
+
+         // --- SDK tab: contains Python, TypeScript, SASS, YAML, JSON, and Markdown nested tabs ---
          Tab pythonTab = new Tab("Python", pythonContent);
          pythonTab.setClosable(false);
 
@@ -219,7 +248,10 @@ public class SettingsDialog {
          Tab jsonTab = new Tab("JSON", jsonContent);
          jsonTab.setClosable(false);
 
-         TabPane sdkContent = new TabPane(pythonTab, typescriptTab, sassTab, yamlTab, jsonTab);
+         Tab markdownTab = new Tab("Markdown", markdownContent);
+         markdownTab.setClosable(false);
+
+         TabPane sdkContent = new TabPane(pythonTab, typescriptTab, sassTab, yamlTab, jsonTab, markdownTab);
         sdkContent.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
         // --- Project tab: contains SDK nested tab ---
@@ -247,6 +279,7 @@ public class SettingsDialog {
               Settings.set(Settings.SettingKey.SASS_SERVER_PATH, sassServerField.getText());
               Settings.set(Settings.SettingKey.YAML_SERVER_PATH, yamlServerField.getText());
               Settings.set(Settings.SettingKey.JSON_SERVER_PATH, jsonServerField.getText());
+              Settings.set(Settings.SettingKey.MARKDOWN_SERVER_PATH, markdownServerField.getText());
               stage.close();
           });
 

@@ -27,7 +27,8 @@ public class Settings {
         TS_SERVER_PATH("typescript", "serverPath", "typescript-language-server --stdio"),
         SASS_SERVER_PATH("sass", "serverPath", "some-sass-language-server --stdio"),
         YAML_SERVER_PATH("yaml", "serverPath", "yaml-language-server --stdio"),
-        JSON_SERVER_PATH("json", "serverPath", "vscode-json-languageserver --stdio");
+        JSON_SERVER_PATH("json", "serverPath", "vscode-json-languageserver --stdio"),
+        MARKDOWN_SERVER_PATH("markdown", "serverPath", "rumdl server");
 
         private final String section;
         private final String key;
@@ -172,6 +173,7 @@ public class Settings {
             case "scss" -> SettingKey.SASS_SERVER_PATH;
             case "yaml" -> SettingKey.YAML_SERVER_PATH;
             case "json", "json5", "jsonc" -> SettingKey.JSON_SERVER_PATH;
+            case "markdown" -> SettingKey.MARKDOWN_SERVER_PATH;
             default -> null;
         };
         
