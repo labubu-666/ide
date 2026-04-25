@@ -10,5 +10,5 @@ This repository contains a simple IDE implementation using JavaFX and LSP4J.
 - Assertions use `AssertJ`
 - Run tests with after changes to prevent regressions
 ```bash
-gradle test
+./gradlew test
 ```
