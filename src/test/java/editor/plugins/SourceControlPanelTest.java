@@ -23,7 +23,8 @@ import org.testfx.framework.junit5.ApplicationExtension;
 import org.testfx.framework.junit5.Start;
 import org.testfx.util.WaitForAsyncUtils;
 
-import editor.plugins.SourceControlPanel.Header;
+import editor.plugins.versioncontrol.git.SourceControlPanel;
+import editor.plugins.versioncontrol.git.SourceControlPanel.Header;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
