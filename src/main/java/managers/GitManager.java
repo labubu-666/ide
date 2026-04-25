@@ -1,4 +1,4 @@
-package editor;
+package managers;
 
 import java.io.File;
 import java.io.IOException;
@@ -14,10 +14,6 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
 import org.eclipse.jgit.lib.PersonIdent;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.treewalk.AbstractTreeIterator;
-import org.eclipse.jgit.treewalk.CanonicalTreeParser;
-import org.eclipse.jgit.diff.DiffEntry;
 
 /**
  * Manages git repository detection, information retrieval, and operations.
