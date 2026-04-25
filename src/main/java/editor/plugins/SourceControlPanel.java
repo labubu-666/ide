@@ -21,14 +21,71 @@ import javafx.scene.layout.VBox;
 
 import managers.GitManager;
 
-/**
- * Source Control Panel component for managing git changes, staging, and commits.
- * Displays file changes with status indicators and provides UI for staging, unstaging,
- * and committing changes.
- */
 import javafx.scene.control.ScrollPane;
 
 public class SourceControlPanel extends ScrollPane {
+
+    /**
+     * Header component for the SourceControlPanel.
+     * Displays the title and a refresh button, and allows listening for refresh callbacks.
+     */
+    public static class Header extends HBox {
+        private final Button refreshButton;
+        private final Label titleLabel;
+        private java.util.List<Consumer<Void>> refreshListeners = new java.util.ArrayList<>();
+
+        public Header() {
+            super(8);
+            setAlignment(Pos.CENTER_LEFT);
+            setId("sourceControlHeader");
+
+            titleLabel = new Label("Source Control");
+            titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
+            titleLabel.setId("headerTitle");
+
+            refreshButton = new Button("Refresh");
+            refreshButton.setStyle("-fx-padding: 3 8 3 8; -fx-font-size: 11px;");
+            refreshButton.setId("refreshButton");
+            refreshButton.setOnAction(e -> {
+                refreshListeners.forEach(listener -> listener.accept(null));
+            });
+
+            HBox.setHgrow(refreshButton, Priority.ALWAYS);
+            getChildren().addAll(titleLabel, refreshButton);
+        }
+
+        /**
+         * Add a listener to be notified when the refresh button is clicked.
+         * @param listener the listener to add
+         */
+        public void addRefreshListener(Consumer<Void> listener) {
+            refreshListeners.add(listener);
+        }
+
+        /**
+         * Remove a refresh listener.
+         * @param listener the listener to remove
+         */
+        public void removeRefreshListener(Consumer<Void> listener) {
+            refreshListeners.remove(listener);
+        }
+
+        /**
+         * Get the refresh button for testing purposes.
+         * @return the refresh button
+         */
+        public Button getRefreshButton() {
+            return refreshButton;
+        }
+
+        /**
+         * Get the title label for testing purposes.
+         * @return the title label
+         */
+        public Label getTitleLabel() {
+            return titleLabel;
+        }
+    }
 
     private final GitManager gitManager;
     private final Consumer<Void> onRefresh;
@@ -74,15 +131,8 @@ public class SourceControlPanel extends ScrollPane {
         }
 
         // Header
-        HBox header = new HBox(8);
-        header.setAlignment(Pos.CENTER_LEFT);
-        Label title = new Label("Source Control");
-        title.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
-        Button refreshButton = new Button("Refresh");
-        refreshButton.setStyle("-fx-padding: 3 8 3 8; -fx-font-size: 11px;");
-        refreshButton.setOnAction(e -> refreshStatus());
-        HBox.setHgrow(refreshButton, Priority.ALWAYS);
-        header.getChildren().addAll(title, refreshButton);
+        Header header = new Header();
+        header.addRefreshListener(v -> refreshStatus());
 
         // Commit message section
         Label messageLabel = new Label("Commit Message");
