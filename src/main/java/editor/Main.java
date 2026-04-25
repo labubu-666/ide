@@ -28,7 +28,6 @@ import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.ToggleGroup;
-import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
@@ -42,6 +41,7 @@ import javafx.stage.Stage;
 import managers.FileManager;
 import managers.GitManager;
 import settings.Settings;
+import editor.plugins.versioncontrol.git.BranchButton;
 import filetype.FileTypeRegistry;
 import language.Languages;
 import lsp.CompletionProvider;
@@ -76,6 +76,7 @@ public class Main extends Application {
     private RightPanel rightPanel;
     private EditorContext editorCtx;
     private GitManager gitManager;
+    private BranchButton branchButton;
 
     @Override
     public void start(Stage primaryStage) {
@@ -159,13 +160,13 @@ public class Main extends Application {
         Separator statusSep2 = new Separator(Orientation.VERTICAL);
         
         // Git branch button with icon (on the left)
-        javafx.scene.control.Button gitBranchButton = createGitBranchButton();
+        branchButton = new BranchButton(gitManager);
         
         // Spacer to push file info to the right
         javafx.scene.layout.Region spacer = new javafx.scene.layout.Region();
         javafx.scene.layout.HBox.setHgrow(spacer, Priority.ALWAYS);
         
-        HBox statusBar = new HBox(8, gitBranchButton, spacer, statusTypeLabel, statusSep, statusSizeLabel);
+        HBox statusBar = new HBox(8, branchButton, spacer, statusTypeLabel, statusSep, statusSizeLabel);
         statusBar.setPadding(new Insets(4, 10, 4, 10));
         statusBar.setStyle("-fx-background-color: #e8e8e8; -fx-border-color: #cccccc; -fx-border-width: 1 0 0 0;");
 
@@ -403,9 +404,17 @@ public class Main extends Application {
         Tab selected = tabPane.getSelectionModel().getSelectedItem();
         if (selected instanceof EditorTab et && et.filePath != null) {
             setStatus(et.filePath);
+            refreshBranchButton();
             return;
         }
         leftPanel.getSelectedFilePath().ifPresentOrElse(this::setStatus, this::clearStatus);
+        refreshBranchButton();
+    }
+    
+    private void refreshBranchButton() {
+        if (branchButton != null) {
+            branchButton.refresh();
+        }
     }
 
     private void setStatus(Path path) {
@@ -432,59 +441,6 @@ public class Main extends Application {
         return String.format("%.1f GB", bytes / (1024.0 * 1024 * 1024));
     }
 
-    private javafx.scene.control.Button createGitBranchButton() {
-        javafx.scene.control.Button container = new javafx.scene.control.Button();
-        
-        // If not in a git repository, log and return hidden button
-        if (!gitManager.isGitRepository()) {
-            System.out.println("[Git] Not in a git repository");
-            container.setVisible(false);
-            container.setManaged(false);
-            return container;
-        }
-        
-        javafx.scene.control.Button btn = new javafx.scene.control.Button();
-        btn.setPrefHeight(24);
-        btn.setMinHeight(24);
-        btn.setStyle("-fx-padding: 2 8 2 8; -fx-focus-color: transparent; -fx-faint-focus-color: transparent; -fx-font-size: 11px;");
-        
-        // Load and set the arrow-split-090 icon
-        try {
-            Image icon = new Image(Main.class.getResourceAsStream("/editor/icons/arrow-split-090.png"));
-            ImageView iconView = new ImageView(icon);
-            iconView.setFitWidth(14);
-            iconView.setFitHeight(14);
-            btn.setGraphic(iconView);
-        } catch (Exception e) {
-            btn.setText("Git");
-        }
-        
-        // Set the git status text
-        String gitStatus = gitManager.getDisplayString();
-        statusBranchLabel.setText(gitStatus);
-        btn.setTooltip(new javafx.scene.control.Tooltip("Current branch: " + gitStatus));
-        
-        // Button could be extended to show git log or open source control panel
-        btn.setOnAction(e -> {
-            // Future: Open source control panel or show git log
-        });
-        
-        // Container to hold icon and text together
-        javafx.scene.layout.HBox buttonContent = new javafx.scene.layout.HBox(4);
-        buttonContent.setAlignment(javafx.geometry.Pos.CENTER);
-        buttonContent.getChildren().addAll(btn.getGraphic(), statusBranchLabel);
-        
-        container.setGraphic(buttonContent);
-        container.setPrefHeight(24);
-        container.setMinHeight(24);
-        container.setStyle("-fx-padding: 2 8 2 2; -fx-focus-color: transparent; -fx-faint-focus-color: transparent; -fx-font-size: 11px;");
-        container.setTooltip(new javafx.scene.control.Tooltip("Current branch: " + gitStatus));
-        container.setOnAction(e -> {
-            // Future: Open source control panel or show git log
-        });
-        
-        return container;
-    }
 
     @Override
     public void stop() {

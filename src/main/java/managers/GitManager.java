@@ -339,6 +339,25 @@ public class GitManager {
         }
     }
 
+
+    /**
+     * Checks if there are any staged changes ready to commit.
+     *
+     * @return true if there are staged changes, false otherwise
+     */
+    public boolean hasStagedChanges() {
+        return !getStagedChanges().isEmpty();
+    }
+
+    /**
+     * Checks if there are any unstaged changes in the working directory.
+     *
+     * @return true if there are unstaged changes, false otherwise
+     */
+    public boolean hasUnstagedChanges() {
+        return !getUnstagedChanges().isEmpty();
+    }
+
     /**
      * Closes the repository and releases resources.
      */
