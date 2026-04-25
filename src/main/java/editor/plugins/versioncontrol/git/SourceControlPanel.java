@@ -181,8 +181,8 @@ public class SourceControlPanel extends ScrollPane {
             header,
             messageLabel, messageArea,
             commitButtonBox,
-            unstagedPane,
-            stagedPane
+            stagedPane,
+            unstagedPane
         );
 
         VBox.setVgrow(changesView, Priority.SOMETIMES);
