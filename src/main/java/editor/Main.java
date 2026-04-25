@@ -1,4 +1,4 @@
-package editor.scenes;
+package editor;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -42,8 +42,6 @@ import javafx.stage.Stage;
 import managers.FileManager;
 import managers.GitManager;
 import settings.Settings;
-import editor.TabOperations;
-import editor.Utils;
 import filetype.FileTypeRegistry;
 import language.Languages;
 import lsp.CompletionProvider;
