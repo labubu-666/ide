@@ -84,6 +84,20 @@ public class GitManager {
     }
 
     /**
+     * Gets the underlying JGit Repository, or null if not in a git repo.
+     */
+    public org.eclipse.jgit.lib.Repository getRepository() {
+        return repository;
+    }
+
+    /**
+     * Gets the root path of the project being managed.
+     */
+    public Path getRootPath() {
+        return rootPath;
+    }
+
+    /**
      * Checks if the current path is inside a git repository.
      *
      * @return true if a git repository was detected, false otherwise

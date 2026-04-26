@@ -12,3 +12,4 @@ This repository contains a simple IDE implementation using JavaFX and LSP4J.
 ```bash
 ./gradlew test
 ```
+- Don't run the application yourself, ill handle it myself.

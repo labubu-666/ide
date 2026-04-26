@@ -89,6 +89,7 @@ public class SourceControlPanel extends ScrollPane {
 
     private final GitManager gitManager;
     private final Consumer<Void> onRefresh;
+    private final Consumer<Path> onOpenDiff;
     private ListView<FileChange> changesView;
     private ListView<FileChange> stagedView;
     private TitledPane unstagedPane;
@@ -105,9 +106,10 @@ public class SourceControlPanel extends ScrollPane {
         }
     }
 
-    public SourceControlPanel(GitManager gitManager, Consumer<Void> onRefresh) {
+    public SourceControlPanel(GitManager gitManager, Consumer<Void> onRefresh, Consumer<Path> onOpenDiff) {
         this.gitManager = gitManager;
         this.onRefresh = onRefresh;
+        this.onOpenDiff = onOpenDiff;
 
         VBox content = new VBox(8);
         content.setPadding(new Insets(8));
@@ -288,6 +290,13 @@ public class SourceControlPanel extends ScrollPane {
 
                 box.getChildren().addAll(statusLabel, details, spacer, actionButton);
                 setGraphic(box);
+
+                // Double-click opens diff view for this file
+                setOnMouseClicked(e -> {
+                    if (e.getClickCount() == 2 && onOpenDiff != null) {
+                        onOpenDiff.accept(item.path);
+                    }
+                });
             }
         };
     }

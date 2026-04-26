@@ -1,0 +1,9 @@
+.diff-added {
+    -fx-fill: green;
+    -fx-background-color: #c8e6c9;
+}
+
+.diff-deleted {
+    -fx-fill: red;
+    -fx-background-color: #ffcdd2;
+}
