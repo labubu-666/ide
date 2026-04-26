@@ -121,6 +121,7 @@ public class Main extends Application {
 
         leftPanel = new LeftPanel(rootPath, fileTypes,
                 this::openOrFocusFile,
+                this::openDiffTab,
                 this::handleFileRenamed,
                 this::handleFileDeleted,
                 pos -> mainSplitPane.setDividerPositions(pos, 0.75),
@@ -132,6 +133,12 @@ public class Main extends Application {
             if (newVal instanceof EditorTab et) {
                 updateStylesheet(et.extension);
                 updateViewMenu(et);
+            }
+            // also update view menu when selecting a DiffEditorTab to clear preview controls
+            if (newVal instanceof DiffEditorTab) {
+                // nothing specific yet, but clear stylesheet to avoid preview errors
+                Scene scene = tabPane.getScene();
+                if (scene != null) scene.getStylesheets().clear();
             }
             refreshStatus();
         });
@@ -258,8 +265,11 @@ public class Main extends Application {
     }
 
     private void openOrFocusFile(Path path) {
+        // Resolve relative paths relative to the project root for matching
+        Path absolutePath = path.isAbsolute() ? path : rootPath.resolve(path);
+        
         for (Tab tab : tabPane.getTabs()) {
-            if (tab instanceof EditorTab et && path.equals(et.filePath)) {
+            if (tab instanceof EditorTab et && absolutePath.equals(et.filePath)) {
                 tabPane.getSelectionModel().select(tab);
                 return;
             }
@@ -268,23 +278,43 @@ public class Main extends Application {
     }
 
     private void openFileInTab(Path filePath) {
-        String fileName = filePath.getFileName().toString();
+        // Resolve relative paths relative to the project root
+        Path absolutePath = filePath.isAbsolute() ? filePath : rootPath.resolve(filePath);
+        
+        String fileName = absolutePath.getFileName().toString();
         int dot = fileName.lastIndexOf('.');
         String ext = (dot > 0) ? fileName.substring(dot + 1) : "";
         try {
             FileManager fileManager = new FileManager();
-            FileManager.FileContent fileContent = fileManager.loadFile(filePath);
-            EditorTab tab = new EditorTab(fileName, fileContent.getContent(), ext, filePath, editorCtx);
+            FileManager.FileContent fileContent = fileManager.loadFile(absolutePath);
+            EditorTab tab = new EditorTab(fileName, fileContent.getContent(), ext, absolutePath, editorCtx);
             tab.initializeWithFileContent(fileContent);
             var img = fileTypes.iconFor(fileTypes.forExtension(ext));
             if (img != null) tab.setGraphic(new ImageView(img));
             tab.setContextMenu(buildTabContextMenu(tab));
             tabPane.getTabs().add(tab);
             tabPane.getSelectionModel().select(tab);
-            docManager.didOpen(filePath, fileContent.getContent(), Languages.forExtension(ext).languageId());
+            docManager.didOpen(absolutePath, fileContent.getContent(), Languages.forExtension(ext).languageId());
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private void openDiffTab(Path filePath) {
+        // If an EditorTab or DiffEditorTab for this file exists, focus it
+        for (var tab : tabPane.getTabs()) {
+            if (tab instanceof DiffEditorTab det && filePath.equals(det.filePath)) {
+                tabPane.getSelectionModel().select(tab);
+                return;
+            }
+            if (tab instanceof EditorTab et && filePath.equals(et.filePath)) {
+                tabPane.getSelectionModel().select(tab);
+                return;
+            }
+        }
+        DiffEditorTab diffTab = new DiffEditorTab(filePath, editorCtx, gitManager);
+        tabPane.getTabs().add(diffTab);
+        tabPane.getSelectionModel().select(diffTab);
     }
 
     private ContextMenu buildTabContextMenu(Tab tab) {

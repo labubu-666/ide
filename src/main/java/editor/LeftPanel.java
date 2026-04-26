@@ -45,6 +45,7 @@ class LeftPanel extends HBox {
 
     private final FileTypeRegistry fileTypes;
     private final Consumer<Path> onFileOpen;
+    private final Consumer<Path> onOpenDiff;
     private final BiConsumer<Path, Path> onFileRenamed;
     private final Consumer<Path> onFileDeleted;
     private final Consumer<Double> onDividerChange;
@@ -65,6 +66,7 @@ class LeftPanel extends HBox {
 
     LeftPanel(Path rootPath, FileTypeRegistry fileTypes,
               Consumer<Path> onFileOpen,
+              Consumer<Path> onOpenDiff,
               BiConsumer<Path, Path> onFileRenamed,
               Consumer<Path> onFileDeleted,
               Consumer<Double> onDividerChange,
@@ -75,6 +77,7 @@ class LeftPanel extends HBox {
         this.onFileRenamed = onFileRenamed;
         this.onFileDeleted = onFileDeleted;
         this.onDividerChange = onDividerChange;
+        this.onOpenDiff = onOpenDiff;
         this.gitManager = gitManager != null ? gitManager : new GitManager(rootPath);
 
         VBox sidebar = new VBox();
@@ -169,6 +172,19 @@ class LeftPanel extends HBox {
             }
         });
 
+        // double-click in tree opens diff if source control tab is active
+        fileTree.setOnMouseClicked(e -> {
+            if (e.getClickCount() == 2) {
+                TreeItem<TreeNode> sel = fileTree.getSelectionModel().getSelectedItem();
+                if (sel != null && sel.isLeaf()) {
+                    Path p = sel.getValue().path();
+                    if (p != null && Files.isRegularFile(p) && onOpenDiff != null) {
+                        onOpenDiff.accept(p);
+                    }
+                }
+            }
+        });
+
         contentArea = new StackPane();
         contentArea.getChildren().add(fileTree);
 
@@ -219,6 +235,9 @@ class LeftPanel extends HBox {
                 if (sourceControlPanel == null) {
                     sourceControlPanel = new SourceControlPanel(gitManager, v -> {
                         // Refresh callback - can be used to refresh other UI if needed
+                    }, p -> {
+                        // open diff callback forwarded from Main
+                        if (onOpenDiff != null) onOpenDiff.accept(p);
                     });
                 } else {
                     sourceControlPanel.refreshStatus();

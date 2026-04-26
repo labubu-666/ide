@@ -111,7 +111,7 @@ class SourceControlPanelTest {
         
         panel = new SourceControlPanel(gitManager, v -> {
             // Refresh callback
-        });
+        }, null);
         
         stage.setScene(new Scene(new StackPane(panel), 400, 600));
         stage.show();
@@ -172,7 +172,7 @@ class SourceControlPanelTest {
             // Create a SourceControlPanel with the non-git directory on the JavaFX thread
             final Stage[] testStageHolder = new Stage[1];
             WaitForAsyncUtils.asyncFx(() -> {
-                SourceControlPanel nonGitPanel = new SourceControlPanel(nonGitManager, v -> {});
+                SourceControlPanel nonGitPanel = new SourceControlPanel(nonGitManager, v -> {}, null);
                 
                 // Add the panel to a new stage so we can query it with FxRobot
                 Stage testStage = new Stage();
@@ -301,7 +301,7 @@ class SourceControlPanelTest {
             AtomicBoolean refreshCallbackInvoked = new AtomicBoolean(false);
             SourceControlPanel panel = new SourceControlPanel(gitManager, v -> {
                 refreshCallbackInvoked.set(true);
-            });
+            }, null);
             
             // Create a new test file
             Path testFile = repo.resolve("test-file.txt");
@@ -380,7 +380,7 @@ class SourceControlPanelTest {
             GitManager gitManager = new GitManager(repo);
             
             // Create a SourceControlPanel with the temp repo
-            SourceControlPanel panel = new SourceControlPanel(gitManager, v -> {});
+            SourceControlPanel panel = new SourceControlPanel(gitManager, v -> {}, null);
             
             // Create a new test file
             Path testFile = repo.resolve("unstage-test.txt");
