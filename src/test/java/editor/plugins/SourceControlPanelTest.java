@@ -111,7 +111,7 @@ class SourceControlPanelTest {
         
         panel = new SourceControlPanel(gitManager, v -> {
             // Refresh callback
-        }, null);
+        }, null, null);
         
         stage.setScene(new Scene(new StackPane(panel), 400, 600));
         stage.show();
@@ -172,7 +172,7 @@ class SourceControlPanelTest {
             // Create a SourceControlPanel with the non-git directory on the JavaFX thread
             final Stage[] testStageHolder = new Stage[1];
             WaitForAsyncUtils.asyncFx(() -> {
-                SourceControlPanel nonGitPanel = new SourceControlPanel(nonGitManager, v -> {}, null);
+                SourceControlPanel nonGitPanel = new SourceControlPanel(nonGitManager, v -> {}, null, null);
                 
                 // Add the panel to a new stage so we can query it with FxRobot
                 Stage testStage = new Stage();
@@ -301,7 +301,7 @@ class SourceControlPanelTest {
             AtomicBoolean refreshCallbackInvoked = new AtomicBoolean(false);
             SourceControlPanel panel = new SourceControlPanel(gitManager, v -> {
                 refreshCallbackInvoked.set(true);
-            }, null);
+            }, null, null);
             
             // Create a new test file
             Path testFile = repo.resolve("test-file.txt");
@@ -369,6 +369,62 @@ class SourceControlPanelTest {
         }
     }
 
+    @Test
+    void should_discard_changes_to_modified_tracked_file() throws Exception {
+        Path repo = createTempGitRepository();
+        try {
+            GitManager gitManager = new GitManager(repo);
+
+            // Modify the committed README.md
+            Files.writeString(repo.resolve("README.md"), "modified content\n");
+            Path relativeFile = Paths.get("README.md");
+
+            var unstagedChanges = gitManager.getUnstagedChanges();
+            assertThat(unstagedChanges.get(relativeFile))
+                .as("README.md should appear as modified")
+                .isEqualTo("M");
+
+            boolean result = gitManager.discardChanges(relativeFile);
+            assertThat(result).as("discardChanges should succeed").isTrue();
+
+            unstagedChanges = gitManager.getUnstagedChanges();
+            assertThat(unstagedChanges.containsKey(relativeFile))
+                .as("File should no longer appear in unstaged changes after discard")
+                .isFalse();
+
+            gitManager.close();
+        } finally {
+            deleteDirectoryRecursively(repo);
+        }
+    }
+
+    @Test
+    void should_discard_untracked_file_by_deleting_it() throws Exception {
+        Path repo = createTempGitRepository();
+        try {
+            GitManager gitManager = new GitManager(repo);
+
+            Path newFile = repo.resolve("new-untracked.txt");
+            Files.writeString(newFile, "untracked content\n");
+            Path relativeFile = Paths.get("new-untracked.txt");
+
+            var unstagedChanges = gitManager.getUnstagedChanges();
+            assertThat(unstagedChanges.get(relativeFile))
+                .as("New file should appear as untracked")
+                .isEqualTo("U");
+
+            boolean result = gitManager.discardChanges(relativeFile);
+            assertThat(result).as("discardChanges should succeed").isTrue();
+            assertThat(Files.exists(newFile))
+                .as("Untracked file should be deleted after discard")
+                .isFalse();
+
+            gitManager.close();
+        } finally {
+            deleteDirectoryRecursively(repo);
+        }
+    }
+
     /**
      * Test that a file can be moved from staged back to unstaged changes.
      * This verifies the unstaging functionality works correctly in the SourceControlPanel.
@@ -380,7 +436,7 @@ class SourceControlPanelTest {
             GitManager gitManager = new GitManager(repo);
             
             // Create a SourceControlPanel with the temp repo
-            SourceControlPanel panel = new SourceControlPanel(gitManager, v -> {}, null);
+            SourceControlPanel panel = new SourceControlPanel(gitManager, v -> {}, null, null);
             
             // Create a new test file
             Path testFile = repo.resolve("unstage-test.txt");

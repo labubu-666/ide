@@ -124,6 +124,7 @@ public class Main extends Application {
                 this::openDiffTab,
                 this::handleFileRenamed,
                 this::handleFileDeleted,
+                this::handleFileDiscarded,
                 pos -> mainSplitPane.setDividerPositions(pos, 0.75),
                 gitManager);
 
@@ -406,6 +407,31 @@ public class Main extends Application {
     private void handleFileDeleted(Path path) {
         tabPane.getTabs().removeIf(t -> t instanceof EditorTab et && path.equals(et.filePath));
         refreshStatus();
+    }
+
+    private void handleFileDiscarded(Path path) {
+        if (!Files.exists(path)) {
+            handleFileDeleted(path);
+        } else {
+            for (Tab t : tabPane.getTabs()) {
+                if (t instanceof EditorTab et && path.equals(et.filePath)) {
+                    reloadTabFromDisk(et);
+                    break;
+                }
+            }
+            refreshStatus();
+        }
+    }
+
+    private void reloadTabFromDisk(EditorTab et) {
+        try {
+            FileManager fileManager = new FileManager();
+            FileManager.FileContent fileContent = fileManager.loadFile(et.filePath);
+            et.codeArea.replaceText(fileContent.getContent());
+            et.initializeWithFileContent(fileContent);
+        } catch (IOException e) {
+            new Alert(AlertType.ERROR, "Failed to reload file: " + e.getMessage()).showAndWait();
+        }
     }
 
     private void updateStylesheet(String extension) {

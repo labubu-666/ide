@@ -2,6 +2,7 @@ package managers;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -318,6 +319,38 @@ public class GitManager {
             return true;
         } catch (GitAPIException e) {
             System.err.println("[Git] Error unstaging file: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Discards changes to an unstaged file, reverting it to its last committed state.
+     * Untracked files are deleted from the filesystem.
+     *
+     * @param filePath relative path of the file to discard
+     * @return true if successful, false otherwise
+     */
+    public boolean discardChanges(Path filePath) {
+        if (!isGitRepo || git == null) {
+            return false;
+        }
+
+        try {
+            String relativePath = filePath.isAbsolute()
+                ? rootPath.relativize(filePath).toString()
+                : filePath.toString();
+
+            Path relPath = filePath.isAbsolute() ? rootPath.relativize(filePath) : filePath;
+            String status = getUnstagedChanges().get(relPath);
+
+            if ("U".equals(status)) {
+                Files.deleteIfExists(rootPath.resolve(relativePath));
+            } else {
+                git.checkout().addPath(relativePath).call();
+            }
+            return true;
+        } catch (Exception e) {
+            System.err.println("[Git] Error discarding changes: " + e.getMessage());
             return false;
         }
     }
