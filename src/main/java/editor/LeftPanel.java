@@ -48,6 +48,7 @@ class LeftPanel extends HBox {
     private final Consumer<Path> onOpenDiff;
     private final BiConsumer<Path, Path> onFileRenamed;
     private final Consumer<Path> onFileDeleted;
+    private final Consumer<Path> onFileDiscarded;
     private final Consumer<Double> onDividerChange;
     private final GitManager gitManager;
 
@@ -69,6 +70,7 @@ class LeftPanel extends HBox {
               Consumer<Path> onOpenDiff,
               BiConsumer<Path, Path> onFileRenamed,
               Consumer<Path> onFileDeleted,
+              Consumer<Path> onFileDiscarded,
               Consumer<Double> onDividerChange,
               GitManager gitManager) {
         this.rootPath = rootPath;
@@ -76,6 +78,7 @@ class LeftPanel extends HBox {
         this.onFileOpen = onFileOpen;
         this.onFileRenamed = onFileRenamed;
         this.onFileDeleted = onFileDeleted;
+        this.onFileDiscarded = onFileDiscarded;
         this.onDividerChange = onDividerChange;
         this.onOpenDiff = onOpenDiff;
         this.gitManager = gitManager != null ? gitManager : new GitManager(rootPath);
@@ -238,6 +241,9 @@ class LeftPanel extends HBox {
                     }, p -> {
                         // open diff callback forwarded from Main
                         if (onOpenDiff != null) onOpenDiff.accept(p);
+                    }, p -> {
+                        refreshTree();
+                        if (onFileDiscarded != null) onFileDiscarded.accept(p);
                     });
                 } else {
                     sourceControlPanel.refreshStatus();

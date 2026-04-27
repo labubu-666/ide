@@ -90,6 +90,7 @@ public class SourceControlPanel extends ScrollPane {
     private final GitManager gitManager;
     private final Consumer<Void> onRefresh;
     private final Consumer<Path> onOpenDiff;
+    private final Consumer<Path> onFileDiscarded;
     private ListView<FileChange> changesView;
     private ListView<FileChange> stagedView;
     private TitledPane unstagedPane;
@@ -106,10 +107,11 @@ public class SourceControlPanel extends ScrollPane {
         }
     }
 
-    public SourceControlPanel(GitManager gitManager, Consumer<Void> onRefresh, Consumer<Path> onOpenDiff) {
+    public SourceControlPanel(GitManager gitManager, Consumer<Void> onRefresh, Consumer<Path> onOpenDiff, Consumer<Path> onFileDiscarded) {
         this.gitManager = gitManager;
         this.onRefresh = onRefresh;
         this.onOpenDiff = onOpenDiff;
+        this.onFileDiscarded = onFileDiscarded;
 
         VBox content = new VBox(8);
         content.setPadding(new Insets(8));
@@ -288,7 +290,22 @@ public class SourceControlPanel extends ScrollPane {
                 Region spacer = new Region();
                 HBox.setHgrow(spacer, Priority.ALWAYS);
 
-                box.getChildren().addAll(statusLabel, details, spacer, actionButton);
+                HBox buttons = new HBox(4);
+                if (!isStaged) {
+                    Button discardButton = new Button("Discard");
+                    discardButton.setStyle("-fx-padding: 2 5 2 5; -fx-font-size: 10px; -fx-text-fill: #f44336;");
+                    discardButton.setOnAction(e -> {
+                        Path absolutePath = gitManager.getRootPath().resolve(item.path);
+                        gitManager.discardChanges(item.path);
+                        refreshStatus();
+                        if (onFileDiscarded != null) onFileDiscarded.accept(absolutePath);
+                        if (onRefresh != null) onRefresh.accept(null);
+                    });
+                    buttons.getChildren().add(discardButton);
+                }
+                buttons.getChildren().add(actionButton);
+
+                box.getChildren().addAll(statusLabel, details, spacer, buttons);
                 setGraphic(box);
 
                 // Double-click opens diff view for this file
