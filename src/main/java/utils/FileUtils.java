@@ -6,7 +6,7 @@ import java.nio.file.Path;
 /**
  * Utility class for common operations.
  */
-public class Utils {
+public class FileUtils {
     
     /**
      * Validates that a path exists and is a directory.
