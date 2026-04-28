@@ -49,7 +49,7 @@ import lsp.DocumentManager;
 import lsp.LspServerRegistry;
 import preview.PreviewRegistry;
 import settings.SettingsDialog;
-import utils.Utils;
+import utils.FileUtils;
 
 public class Main extends Application {
 
@@ -88,8 +88,8 @@ public class Main extends Application {
                 ? Paths.get(params.get(0))
                 : Paths.get("")).toAbsolutePath().normalize();
 
-        if (!Utils.isValidDirectory(rootPath)) {
-            String errorMessage = Utils.getValidationError(rootPath);
+        if (!FileUtils.isValidDirectory(rootPath)) {
+            String errorMessage = FileUtils.getValidationError(rootPath);
             Alert alert = new Alert(AlertType.ERROR);
             alert.setTitle("Invalid Directory");
             alert.setHeaderText("Cannot Open Directory");

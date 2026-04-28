@@ -1,8 +1,7 @@
-package editor;
+package utils;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import utils.Utils;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -10,46 +9,46 @@ import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.*;
 
-class UtilsTest {
+class FileUtilsTest {
 
     @Test
     void testIsValidDirectory_withValidDirectory(@TempDir Path tempDir) {
-        assertThat(Utils.isValidDirectory(tempDir)).isTrue();
+        assertThat(FileUtils.isValidDirectory(tempDir)).isTrue();
     }
 
     @Test
     void testIsValidDirectory_withNullPath() {
-        assertThat(Utils.isValidDirectory(null)).isFalse();
+        assertThat(FileUtils.isValidDirectory(null)).isFalse();
     }
 
     @Test
     void testIsValidDirectory_withNonExistentPath(@TempDir Path tempDir) {
         Path nonExistent = tempDir.resolve("nonexistent");
-        assertThat(Utils.isValidDirectory(nonExistent)).isFalse();
+        assertThat(FileUtils.isValidDirectory(nonExistent)).isFalse();
     }
 
     @Test
     void testIsValidDirectory_withFile(@TempDir Path tempDir) throws IOException {
         Path file = tempDir.resolve("testfile.txt");
         Files.createFile(file);
-        assertThat(Utils.isValidDirectory(file)).isFalse();
+        assertThat(FileUtils.isValidDirectory(file)).isFalse();
     }
 
     @Test
     void testGetValidationError_withValidDirectory(@TempDir Path tempDir) {
-        assertThat(Utils.getValidationError(tempDir)).isNull();
+        assertThat(FileUtils.getValidationError(tempDir)).isNull();
     }
 
     @Test
     void testGetValidationError_withNullPath() {
-        String error = Utils.getValidationError(null);
+        String error = FileUtils.getValidationError(null);
         assertThat(error).isNotNull().contains("null");
     }
 
     @Test
     void testGetValidationError_withNonExistentPath(@TempDir Path tempDir) {
         Path nonExistent = tempDir.resolve("nonexistent");
-        String error = Utils.getValidationError(nonExistent);
+        String error = FileUtils.getValidationError(nonExistent);
         assertThat(error).isNotNull()
             .contains("does not exist")
             .contains(nonExistent.toString());
@@ -59,7 +58,7 @@ class UtilsTest {
     void testGetValidationError_withFile(@TempDir Path tempDir) throws IOException {
         Path file = tempDir.resolve("testfile.txt");
         Files.createFile(file);
-        String error = Utils.getValidationError(file);
+        String error = FileUtils.getValidationError(file);
         assertThat(error).isNotNull()
             .contains("not a directory")
             .contains(file.toString());
@@ -69,7 +68,7 @@ class UtilsTest {
     void testGetValidationError_withNestedDirectory(@TempDir Path tempDir) throws IOException {
         Path nested = tempDir.resolve("level1/level2/level3");
         Files.createDirectories(nested);
-        assertThat(Utils.getValidationError(nested)).isNull();
-        assertThat(Utils.isValidDirectory(nested)).isTrue();
+        assertThat(FileUtils.getValidationError(nested)).isNull();
+        assertThat(FileUtils.isValidDirectory(nested)).isTrue();
     }
 }
