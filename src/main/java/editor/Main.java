@@ -49,6 +49,7 @@ import lsp.DocumentManager;
 import lsp.LspServerRegistry;
 import preview.PreviewRegistry;
 import settings.SettingsDialog;
+import utils.Utils;
 
 public class Main extends Application {
 
