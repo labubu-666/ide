@@ -1,4 +1,4 @@
-package editor;
+package host;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -254,11 +254,11 @@ public class DiffEditorTab extends javafx.scene.control.Tab {
                     String stylesheetUrl = DiffEditorTab.class.getResource(stylesheetResource).toExternalForm();
                     scene.getStylesheets().add(stylesheetUrl);
                 }
-                String lspStyleUrl = DiffEditorTab.class.getResource("/editor/keywords/lsp.css").toExternalForm();
+                String lspStyleUrl = DiffEditorTab.class.getResource("/host/keywords/lsp.css").toExternalForm();
                 if (!scene.getStylesheets().contains(lspStyleUrl)) {
                     scene.getStylesheets().add(lspStyleUrl);
                 }
-                String diffStyleUrl = DiffEditorTab.class.getResource("/editor/keywords/diff.css").toExternalForm();
+                String diffStyleUrl = DiffEditorTab.class.getResource("/host/keywords/diff.css").toExternalForm();
                 if (!scene.getStylesheets().contains(diffStyleUrl)) {
                     scene.getStylesheets().add(diffStyleUrl);
                 }

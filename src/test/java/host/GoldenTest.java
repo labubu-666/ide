@@ -1,4 +1,4 @@
-package editor;
+package host;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -1,4 +1,4 @@
-package editor.plugins.versioncontrol.git;
+package host.plugins.versioncontrol.git;
 
 /**
  * Formats git branch status information into a display string.

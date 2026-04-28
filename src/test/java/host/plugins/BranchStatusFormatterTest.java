@@ -1,11 +1,11 @@
-package editor.plugins;
+package host.plugins;
 
 import static org.assertj.core.api.Assertions.*;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import editor.plugins.versioncontrol.git.BranchStatusFormatter;
+import host.plugins.versioncontrol.git.BranchStatusFormatter;
 
 /**
  * Tests for BranchStatusFormatter class.

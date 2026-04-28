@@ -1,4 +1,4 @@
-package editor.plugins.versioncontrol.git;
+package host.plugins.versioncontrol.git;
 
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -50,7 +50,7 @@ public class BranchButton extends Button {
         
         // Load and add the arrow-split-090 icon
         try {
-            Image icon = new Image(BranchButton.class.getResourceAsStream("/editor/icons/arrow-split-090.png"));
+            Image icon = new Image(BranchButton.class.getResourceAsStream("/host/icons/arrow-split-090.png"));
             ImageView iconView = new ImageView(icon);
             iconView.setFitWidth(14);
             iconView.setFitHeight(14);

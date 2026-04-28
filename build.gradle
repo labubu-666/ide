@@ -45,5 +45,12 @@ javafx {
 }
 
 application {
-    mainClass = 'editor.Main'
+    mainClass = 'host.Main'
+}
+
+task runComponent(type: JavaExec) {
+    group = 'application'
+    description = 'Preview a UI component in isolation. Override the target with -Pcomponent=<fully.qualified.ClassName>.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = project.findProperty('component') ?: 'host.launcher.mounts.BranchButtonMount'
 }
