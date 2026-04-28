@@ -1,4 +1,4 @@
-package editor;
+package host;
 
 import java.util.function.Consumer;
 
@@ -34,7 +34,7 @@ class RightPanel extends HBox {
         sidebar.setSpacing(4);
         sidebar.setStyle("-fx-background-color: #f0f0f0; -fx-border-color: #cccccc; -fx-border-width: 0 0 0 1;");
 
-        tasksButton = createTabButton("Tasks", "/editor/icons/document-list.png");
+        tasksButton = createTabButton("Tasks", "/host/icons/document-list.png");
         tasksButton.setOnAction(e -> selectTab("tasks"));
         tasksButton.setStyle("-fx-padding: 0; -fx-focus-color: transparent; -fx-faint-focus-color: transparent;");
         sidebar.getChildren().add(tasksButton);

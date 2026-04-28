@@ -11,7 +11,7 @@ import language.Languages;
 
 public class FileTypeRegistry {
 
-    private static final String FOLDER_ICON = "editor/icons/folder.png";
+    private static final String FOLDER_ICON = "host/icons/folder.png";
 
     public static final FileType UNKNOWN = new FileType(
         Languages.UNKNOWN.displayName(), Languages.UNKNOWN.extensions(), Languages.UNKNOWN.iconPath()

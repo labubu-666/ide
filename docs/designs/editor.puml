@@ -1,0 +1,6 @@
+@startsalt
+{
+  {/ <b>filename1.extension | filename_2.extension | ... | filename_n.extension }
+  Just plain text
+}
+@endsalt

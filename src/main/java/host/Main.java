@@ -1,4 +1,4 @@
-package editor;
+package host;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -41,7 +41,7 @@ import javafx.stage.Stage;
 import managers.FileManager;
 import managers.GitManager;
 import settings.Settings;
-import editor.plugins.versioncontrol.git.BranchButton;
+import host.plugins.versioncontrol.git.BranchButton;
 import filetype.FileTypeRegistry;
 import language.Languages;
 import lsp.CompletionProvider;
@@ -441,7 +441,7 @@ public class Main extends Application {
             scene.getStylesheets().clear();
             String sheet = Languages.forExtension(extension).stylesheetResource();
             scene.getStylesheets().add(Main.class.getResource(sheet).toExternalForm());
-            scene.getStylesheets().add(Main.class.getResource("/editor/keywords/lsp.css").toExternalForm());
+            scene.getStylesheets().add(Main.class.getResource("/host/keywords/lsp.css").toExternalForm());
         }
     }
 

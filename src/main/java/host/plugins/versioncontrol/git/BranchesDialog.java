@@ -1,11 +1,10 @@
-package editor.plugins.versioncontrol.git;
+package host.plugins.versioncontrol.git;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;

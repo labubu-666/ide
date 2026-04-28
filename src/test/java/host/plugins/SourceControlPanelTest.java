@@ -1,4 +1,4 @@
-package editor.plugins;
+package host.plugins;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -23,8 +23,8 @@ import org.testfx.framework.junit5.ApplicationExtension;
 import org.testfx.framework.junit5.Start;
 import org.testfx.util.WaitForAsyncUtils;
 
-import editor.plugins.versioncontrol.git.SourceControlPanel;
-import editor.plugins.versioncontrol.git.SourceControlPanel.Header;
+import host.plugins.versioncontrol.git.SourceControlPanel;
+import host.plugins.versioncontrol.git.SourceControlPanel.Header;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;

@@ -1,4 +1,4 @@
-package editor;
+package host;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -9,7 +9,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-import editor.plugins.versioncontrol.git.SourceControlPanel;
+import host.plugins.versioncontrol.git.SourceControlPanel;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
@@ -88,9 +88,9 @@ class LeftPanel extends HBox {
         sidebar.setMinWidth(24);
         sidebar.setSpacing(4);
 
-        fileBrowserButton = createTabButton("File Browser", "/editor/icons/document.png");
-        sourceControlButton = createTabButton("Source Control", "/editor/icons/arrow-split-090.png");
-        storeButton = createTabButton("Store", "/editor/icons/store.png");
+        fileBrowserButton = createTabButton("File Browser", "/host/icons/document.png");
+        sourceControlButton = createTabButton("Source Control", "/host/icons/arrow-split-090.png");
+        storeButton = createTabButton("Store", "/host/icons/store.png");
 
         fileBrowserButton.setOnAction(e -> selectTab("file-browser"));
         sourceControlButton.setOnAction(e -> selectTab("source-control"));
