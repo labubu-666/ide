@@ -1,0 +1,9 @@
+@startsalt
+{
+  {* File | View | Settings }
+  {
+    {/ <b>LeftPanel | CenterPanel | RightPanel }
+  }
+  { StatusBar }
+}
+@endsalt
