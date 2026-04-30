@@ -1,7 +1,5 @@
 package host;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.ExecutorService;
@@ -9,22 +7,16 @@ import java.util.concurrent.Executors;
 
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.collections.ListChangeListener;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
-import javafx.scene.control.ContextMenu;
-import javafx.stage.FileChooser;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SplitPane;
-import javafx.scene.control.Tab;
-import javafx.scene.control.TabPane;
 import javafx.scene.control.ToggleGroup;
-import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
@@ -33,7 +25,6 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
-import managers.FileManager;
 import managers.GitManager;
 import settings.Settings;
 import filetype.FileTypeRegistry;
@@ -51,14 +42,12 @@ public class Main extends Application {
         launch(args);
     }
 
-    private TabPane tabPane;
+    private CenterPanel centerPanel;
     private ExecutorService executor;
     private Stage primaryStage;
     private Path rootPath;
     private LspServerRegistry lspRegistry;
-    private DocumentManager docManager;
     private FileTypeRegistry fileTypes;
-    private CompletionProvider completionProvider;
     private StatusBar statusBar;
     private PreviewRegistry previewRegistry;
     private RadioMenuItem viewEditorItem;
@@ -67,7 +56,6 @@ public class Main extends Application {
     private SplitPane mainSplitPane;
     private LeftPanel leftPanel;
     private RightPanel rightPanel;
-    private EditorContext editorCtx;
     private GitManager gitManager;
 
     @Override
@@ -92,62 +80,33 @@ public class Main extends Application {
         Settings.load(rootPath);
         gitManager = new GitManager(rootPath);
         lspRegistry = new LspServerRegistry(rootPath, (uri, diagnostics) ->
-            Platform.runLater(() -> tabPane.getTabs().stream()
-                .filter(t -> t instanceof EditorTab)
-                .map(t -> (EditorTab) t)
-                .filter(et -> et.filePath != null && et.filePath.toUri().toString().equals(uri))
-                .findFirst()
-                .ifPresent(et -> et.setDiagnostics(diagnostics))));
-        docManager = new DocumentManager(lspRegistry);
-        completionProvider = new CompletionProvider(lspRegistry);
+            Platform.runLater(() -> centerPanel.applyDiagnostics(uri, diagnostics)));
+        DocumentManager docManager = new DocumentManager(lspRegistry);
+        CompletionProvider completionProvider = new CompletionProvider(lspRegistry);
         fileTypes = new FileTypeRegistry();
         previewRegistry = new PreviewRegistry();
 
-        tabPane = new TabPane();
-        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
-
-        editorCtx = new EditorContext(executor, docManager, completionProvider, previewRegistry,
-                this::updateViewMenu, this::openOrFocusFile);
+        centerPanel = new CenterPanel(rootPath, executor, docManager, completionProvider,
+                previewRegistry, fileTypes, gitManager,
+                this::onEditorActivated,
+                this::onDiffActivated,
+                this::refreshStatus,
+                this::refreshTree);
 
         MenuBar menuBar = buildMenuBar();
 
         leftPanel = new LeftPanel(rootPath, fileTypes,
-                this::openOrFocusFile,
-                this::openDiffTab,
-                this::handleFileRenamed,
-                this::handleFileDeleted,
-                this::handleFileDiscarded,
+                centerPanel::openFile,
+                centerPanel::openDiff,
+                centerPanel::handleFileRenamed,
+                centerPanel::handleFileDeleted,
+                centerPanel::handleFileDiscarded,
                 pos -> mainSplitPane.setDividerPositions(pos, 0.75),
                 gitManager);
 
         rightPanel = new RightPanel(pos -> mainSplitPane.setDividerPositions(0.20, pos));
 
-        tabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal instanceof EditorTab et) {
-                updateStylesheet(et.extension);
-                updateViewMenu(et);
-            }
-            // also update view menu when selecting a DiffEditorTab to clear preview controls
-            if (newVal instanceof DiffEditorTab) {
-                // nothing specific yet, but clear stylesheet to avoid preview errors
-                Scene scene = tabPane.getScene();
-                if (scene != null) scene.getStylesheets().clear();
-            }
-            refreshStatus();
-        });
-
-        tabPane.getTabs().addListener((ListChangeListener<Tab>) c -> {
-            while (c.next()) {
-                for (Tab t : c.getRemoved()) {
-                    if (t instanceof EditorTab et) {
-                        if (et.filePath != null) docManager.didClose(et.filePath);
-                        et.dispose();
-                    }
-                }
-            }
-        });
-
-        mainSplitPane = new SplitPane(leftPanel, tabPane, rightPanel);
+        mainSplitPane = new SplitPane(leftPanel, centerPanel, rightPanel);
         SplitPane.setResizableWithParent(leftPanel, Boolean.FALSE);
         SplitPane.setResizableWithParent(rightPanel, Boolean.FALSE);
         mainSplitPane.setDividerPositions(0.25, 1.0 - 0.025);
@@ -162,7 +121,7 @@ public class Main extends Application {
         Scene scene = new Scene(root);
         scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN).match(event)) {
-                saveCurrentTab();
+                centerPanel.saveActive();
                 event.consume();
             }
         });
@@ -175,15 +134,15 @@ public class Main extends Application {
     private MenuBar buildMenuBar() {
         MenuItem newItem = new MenuItem("New");
         newItem.setAccelerator(KeyCombination.keyCombination("Shortcut+N"));
-        newItem.setOnAction(e -> createNewTab());
+        newItem.setOnAction(e -> centerPanel.createNew());
 
         MenuItem saveItem = new MenuItem("Save");
         saveItem.setAccelerator(KeyCombination.keyCombination("Shortcut+S"));
-        saveItem.setOnAction(e -> saveCurrentTab());
+        saveItem.setOnAction(e -> centerPanel.saveActive());
 
         MenuItem saveAsItem = new MenuItem("Save As...");
         saveAsItem.setAccelerator(KeyCombination.keyCombination("Shortcut+Shift+S"));
-        saveAsItem.setOnAction(e -> saveCurrentTabAs());
+        saveAsItem.setOnAction(e -> centerPanel.saveActiveAs());
 
         MenuItem exitItem = new MenuItem("Exit");
         exitItem.setOnAction(e -> primaryStage.close());
@@ -196,26 +155,17 @@ public class Main extends Application {
         viewEditorItem.setToggleGroup(viewToggle);
         viewEditorItem.setSelected(true);
         viewEditorItem.setAccelerator(KeyCombination.keyCombination("Shortcut+1"));
-        viewEditorItem.setOnAction(e -> {
-            Tab sel = tabPane.getSelectionModel().getSelectedItem();
-            if (sel instanceof EditorTab et) et.applyViewMode(ViewMode.EDITOR);
-        });
+        viewEditorItem.setOnAction(e -> centerPanel.setViewMode(ViewMode.EDITOR));
 
         viewSplitItem = new RadioMenuItem("Split");
         viewSplitItem.setToggleGroup(viewToggle);
         viewSplitItem.setAccelerator(KeyCombination.keyCombination("Shortcut+2"));
-        viewSplitItem.setOnAction(e -> {
-            Tab sel = tabPane.getSelectionModel().getSelectedItem();
-            if (sel instanceof EditorTab et) et.applyViewMode(ViewMode.SPLIT);
-        });
+        viewSplitItem.setOnAction(e -> centerPanel.setViewMode(ViewMode.SPLIT));
 
         viewPreviewItem = new RadioMenuItem("Preview");
         viewPreviewItem.setToggleGroup(viewToggle);
         viewPreviewItem.setAccelerator(KeyCombination.keyCombination("Shortcut+3"));
-        viewPreviewItem.setOnAction(e -> {
-            Tab sel = tabPane.getSelectionModel().getSelectedItem();
-            if (sel instanceof EditorTab et) et.applyViewMode(ViewMode.PREVIEW);
-        });
+        viewPreviewItem.setOnAction(e -> centerPanel.setViewMode(ViewMode.PREVIEW));
 
         Menu viewMenu = new Menu("View");
         viewMenu.getItems().addAll(viewEditorItem, viewSplitItem, viewPreviewItem);
@@ -230,189 +180,32 @@ public class Main extends Application {
         return new MenuBar(fileMenu, viewMenu, settingsMenu);
     }
 
-    private void createNewTab() {
-        int count = tabPane.getTabs().size();
-        String title = count == 0 ? "Untitled" : "Untitled " + (count + 1);
-        EditorTab tab = new EditorTab(title, "", "java", null, editorCtx);
-        var img = fileTypes.iconFor(fileTypes.forExtension("java"));
-        if (img != null) tab.setGraphic(new ImageView(img));
-        tab.setContextMenu(buildTabContextMenu(tab));
-        tabPane.getTabs().add(tab);
-        tabPane.getSelectionModel().select(tab);
-        updateStylesheet("java");
+    // --- CenterPanel callbacks ---
+
+    private void onEditorActivated(ActiveEditorInfo info) {
+        updateStylesheet(info.extension());
+        updateViewMenu(info.hasPreview(), info.viewMode());
     }
 
-    private void openOrFocusFile(Path path) {
-        // Resolve relative paths relative to the project root for matching
-        Path absolutePath = path.isAbsolute() ? path : rootPath.resolve(path);
-        
-        for (Tab tab : tabPane.getTabs()) {
-            if (tab instanceof EditorTab et && absolutePath.equals(et.filePath)) {
-                tabPane.getSelectionModel().select(tab);
-                return;
-            }
-        }
-        openFileInTab(path);
+    private void onDiffActivated() {
+        Scene scene = primaryStage.getScene();
+        if (scene != null) scene.getStylesheets().clear();
     }
 
-    private void openFileInTab(Path filePath) {
-        // Resolve relative paths relative to the project root
-        Path absolutePath = filePath.isAbsolute() ? filePath : rootPath.resolve(filePath);
-        
-        String fileName = absolutePath.getFileName().toString();
-        int dot = fileName.lastIndexOf('.');
-        String ext = (dot > 0) ? fileName.substring(dot + 1) : "";
-        try {
-            FileManager fileManager = new FileManager();
-            FileManager.FileContent fileContent = fileManager.loadFile(absolutePath);
-            EditorTab tab = new EditorTab(fileName, fileContent.getContent(), ext, absolutePath, editorCtx);
-            tab.initializeWithFileContent(fileContent);
-            var img = fileTypes.iconFor(fileTypes.forExtension(ext));
-            if (img != null) tab.setGraphic(new ImageView(img));
-            tab.setContextMenu(buildTabContextMenu(tab));
-            tabPane.getTabs().add(tab);
-            tabPane.getSelectionModel().select(tab);
-            docManager.didOpen(absolutePath, fileContent.getContent(), Languages.forExtension(ext).languageId());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+    private void refreshStatus() {
+        centerPanel.getActiveFilePath().ifPresentOrElse(
+                statusBar::update,
+                () -> leftPanel.getSelectedFilePath().ifPresentOrElse(statusBar::update, statusBar::clear));
     }
 
-    private void openDiffTab(Path filePath) {
-        // If an EditorTab or DiffEditorTab for this file exists, focus it
-        for (var tab : tabPane.getTabs()) {
-            if (tab instanceof DiffEditorTab det && filePath.equals(det.filePath)) {
-                tabPane.getSelectionModel().select(tab);
-                return;
-            }
-            if (tab instanceof EditorTab et && filePath.equals(et.filePath)) {
-                tabPane.getSelectionModel().select(tab);
-                return;
-            }
-        }
-        DiffEditorTab diffTab = new DiffEditorTab(filePath, editorCtx, gitManager);
-        tabPane.getTabs().add(diffTab);
-        tabPane.getSelectionModel().select(diffTab);
+    private void refreshTree() {
+        leftPanel.refreshTree();
     }
 
-    private ContextMenu buildTabContextMenu(Tab tab) {
-        MenuItem closeItem = new MenuItem("Close");
-        closeItem.setOnAction(e -> TabOperations.close(tabPane.getTabs(), tab));
-
-        MenuItem closeOthersItem = new MenuItem("Close Others");
-        closeOthersItem.setOnAction(e -> TabOperations.closeOthers(tabPane.getTabs(), tab));
-
-        return new ContextMenu(closeItem, closeOthersItem);
-    }
-
-    private void saveCurrentTab() {
-        Tab selected = tabPane.getSelectionModel().getSelectedItem();
-        if (selected instanceof EditorTab et) saveTab(et);
-    }
-
-    private void saveCurrentTabAs() {
-        Tab selected = tabPane.getSelectionModel().getSelectedItem();
-        if (selected instanceof EditorTab et) saveTabAs(et);
-    }
-
-    private void saveTab(EditorTab tab) {
-        if (tab.filePath == null) {
-            saveTabAs(tab);
-            return;
-        }
-        try {
-            FileManager fileManager = new FileManager();
-            String content = tab.codeArea.getText();
-            fileManager.saveFile(tab.filePath, content, tab.fileLastModifiedTime);
-            tab.markAsSaved(Files.getLastModifiedTime(tab.filePath).toMillis());
-            tab.refreshPreview();
-            docManager.didSave(tab.filePath);
-            refreshStatus();
-        } catch (FileManager.OptimisticLockException e) {
-            new Alert(AlertType.ERROR, "File was modified externally: " + e.getMessage()).showAndWait();
-        } catch (IOException e) {
-            new Alert(AlertType.ERROR, "Failed to save: " + e.getMessage()).showAndWait();
-        }
-    }
-
-    private void saveTabAs(EditorTab tab) {
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Save As");
-        if (tab.filePath != null) {
-            chooser.setInitialDirectory(tab.filePath.getParent().toFile());
-            chooser.setInitialFileName(tab.filePath.getFileName().toString());
-        } else {
-            chooser.setInitialDirectory(rootPath.toFile());
-            chooser.setInitialFileName(tab.baseTitle);
-        }
-        java.io.File file = chooser.showSaveDialog(primaryStage);
-        if (file != null) {
-            try {
-                String content = tab.codeArea.getText();
-                Files.writeString(file.toPath(), content);
-
-                if (tab.virtualUri != null) {
-                    docManager.didCloseVirtual(tab.virtualUri, tab.extension);
-                    tab.virtualUri = null;
-                    tab.filePath = file.toPath();
-                    docManager.didOpen(tab.filePath, content, Languages.forExtension(tab.extension).languageId());
-                } else {
-                    tab.filePath = file.toPath();
-                }
-
-                tab.baseTitle = file.getName();
-                tab.setModified(false);
-                leftPanel.refreshTree();
-                refreshStatus();
-            } catch (IOException e) {
-                new Alert(AlertType.ERROR, "Failed to save: " + e.getMessage()).showAndWait();
-            }
-        }
-    }
-
-    private void handleFileRenamed(Path oldPath, Path newPath) {
-        for (Tab t : tabPane.getTabs()) {
-            if (t instanceof EditorTab et && oldPath.equals(et.filePath)) {
-                et.filePath = newPath;
-                et.baseTitle = newPath.getFileName().toString();
-                et.setModified(et.modified);
-            }
-        }
-        refreshStatus();
-    }
-
-    private void handleFileDeleted(Path path) {
-        tabPane.getTabs().removeIf(t -> t instanceof EditorTab et && path.equals(et.filePath));
-        refreshStatus();
-    }
-
-    private void handleFileDiscarded(Path path) {
-        if (!Files.exists(path)) {
-            handleFileDeleted(path);
-        } else {
-            for (Tab t : tabPane.getTabs()) {
-                if (t instanceof EditorTab et && path.equals(et.filePath)) {
-                    reloadTabFromDisk(et);
-                    break;
-                }
-            }
-            refreshStatus();
-        }
-    }
-
-    private void reloadTabFromDisk(EditorTab et) {
-        try {
-            FileManager fileManager = new FileManager();
-            FileManager.FileContent fileContent = fileManager.loadFile(et.filePath);
-            et.codeArea.replaceText(fileContent.getContent());
-            et.initializeWithFileContent(fileContent);
-        } catch (IOException e) {
-            new Alert(AlertType.ERROR, "Failed to reload file: " + e.getMessage()).showAndWait();
-        }
-    }
+    // --- Internal ---
 
     private void updateStylesheet(String extension) {
-        Scene scene = tabPane.getScene();
+        Scene scene = primaryStage.getScene();
         if (scene != null) {
             scene.getStylesheets().clear();
             String sheet = Languages.forExtension(extension).stylesheetResource();
@@ -421,37 +214,22 @@ public class Main extends Application {
         }
     }
 
-    private void updateViewMenu(EditorTab et) {
+    private void updateViewMenu(boolean hasPreview, ViewMode viewMode) {
         if (viewEditorItem == null) return;
-        boolean hasPreview = previewRegistry.hasPreview(et.extension);
         viewSplitItem.setDisable(!hasPreview);
         viewPreviewItem.setDisable(!hasPreview);
-        switch (et.currentViewMode) {
+        switch (viewMode) {
             case EDITOR -> viewEditorItem.setSelected(true);
             case SPLIT -> viewSplitItem.setSelected(true);
             case PREVIEW -> viewPreviewItem.setSelected(true);
         }
     }
 
-    private void refreshStatus() {
-        Tab selected = tabPane.getSelectionModel().getSelectedItem();
-        if (selected instanceof EditorTab et && et.filePath != null) {
-            statusBar.update(et.filePath);
-            return;
-        }
-        leftPanel.getSelectedFilePath().ifPresentOrElse(statusBar::update, statusBar::clear);
-    }
-
-
     @Override
     public void stop() {
         System.err.println("[Main] Application stop() called, initiating graceful shutdown...");
 
-        for (Tab t : tabPane.getTabs()) {
-            if (t instanceof EditorTab et) {
-                et.dispose();
-            }
-        }
+        centerPanel.disposeAll();
 
         try {
             System.err.println("[Main] Waiting for LSP servers to shutdown...");
