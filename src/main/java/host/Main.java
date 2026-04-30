@@ -10,19 +10,15 @@ import java.util.concurrent.Executors;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
-import javafx.geometry.Insets;
-import javafx.geometry.Orientation;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.ContextMenu;
 import javafx.stage.FileChooser;
-import javafx.scene.control.Label;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.RadioMenuItem;
-import javafx.scene.control.Separator;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
@@ -33,7 +29,6 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.input.KeyEvent;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
@@ -41,7 +36,6 @@ import javafx.stage.Stage;
 import managers.FileManager;
 import managers.GitManager;
 import settings.Settings;
-import host.plugins.versioncontrol.git.BranchButton;
 import filetype.FileTypeRegistry;
 import language.Languages;
 import lsp.CompletionProvider;
@@ -65,9 +59,7 @@ public class Main extends Application {
     private DocumentManager docManager;
     private FileTypeRegistry fileTypes;
     private CompletionProvider completionProvider;
-    private Label statusTypeLabel;
-    private Label statusSizeLabel;
-    private Label statusBranchLabel;
+    private StatusBar statusBar;
     private PreviewRegistry previewRegistry;
     private RadioMenuItem viewEditorItem;
     private RadioMenuItem viewSplitItem;
@@ -77,7 +69,6 @@ public class Main extends Application {
     private RightPanel rightPanel;
     private EditorContext editorCtx;
     private GitManager gitManager;
-    private BranchButton branchButton;
 
     @Override
     public void start(Stage primaryStage) {
@@ -162,22 +153,7 @@ public class Main extends Application {
         mainSplitPane.setDividerPositions(0.25, 1.0 - 0.025);
         mainSplitPane.setStyle("-fx-padding: 0;");
 
-        statusTypeLabel = new Label();
-        statusSizeLabel = new Label();
-        statusBranchLabel = new Label();
-        Separator statusSep = new Separator(Orientation.VERTICAL);
-        Separator statusSep2 = new Separator(Orientation.VERTICAL);
-        
-        // Git branch button with icon (on the left)
-        branchButton = new BranchButton(gitManager);
-        
-        // Spacer to push file info to the right
-        javafx.scene.layout.Region spacer = new javafx.scene.layout.Region();
-        javafx.scene.layout.HBox.setHgrow(spacer, Priority.ALWAYS);
-        
-        HBox statusBar = new HBox(8, branchButton, spacer, statusTypeLabel, statusSep, statusSizeLabel);
-        statusBar.setPadding(new Insets(4, 10, 4, 10));
-        statusBar.setStyle("-fx-background-color: #e8e8e8; -fx-border-color: #cccccc; -fx-border-width: 1 0 0 0;");
+        statusBar = new StatusBar(gitManager, fileTypes);
 
         VBox root = new VBox(menuBar, mainSplitPane, statusBar);
         VBox.setVgrow(mainSplitPane, Priority.ALWAYS);
@@ -460,42 +436,10 @@ public class Main extends Application {
     private void refreshStatus() {
         Tab selected = tabPane.getSelectionModel().getSelectedItem();
         if (selected instanceof EditorTab et && et.filePath != null) {
-            setStatus(et.filePath);
-            refreshBranchButton();
+            statusBar.update(et.filePath);
             return;
         }
-        leftPanel.getSelectedFilePath().ifPresentOrElse(this::setStatus, this::clearStatus);
-        refreshBranchButton();
-    }
-    
-    private void refreshBranchButton() {
-        if (branchButton != null) {
-            branchButton.refresh();
-        }
-    }
-
-    private void setStatus(Path path) {
-        String type = fileTypes.forPath(path).name();
-        long size;
-        try {
-            size = Files.size(path);
-        } catch (IOException e) {
-            size = -1;
-        }
-        statusTypeLabel.setText(type);
-        statusSizeLabel.setText(size >= 0 ? humanReadableSize(size) : "");
-    }
-
-    private void clearStatus() {
-        statusTypeLabel.setText("");
-        statusSizeLabel.setText("");
-    }
-
-    private String humanReadableSize(long bytes) {
-        if (bytes < 1024) return bytes + " B";
-        if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
-        if (bytes < 1024L * 1024 * 1024) return String.format("%.1f MB", bytes / (1024.0 * 1024));
-        return String.format("%.1f GB", bytes / (1024.0 * 1024 * 1024));
+        leftPanel.getSelectedFilePath().ifPresentOrElse(statusBar::update, statusBar::clear);
     }
 
 
