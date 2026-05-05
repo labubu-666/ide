@@ -173,12 +173,12 @@ class CenterPanel extends TabPane {
     // --- LSP diagnostics ---
 
     void applyDiagnostics(String uri, List<Diagnostic> diagnostics) {
-        getTabs().stream()
-                .filter(t -> t instanceof EditorTab)
-                .map(t -> (EditorTab) t)
-                .filter(et -> et.filePath != null && et.filePath.toUri().toString().equals(uri))
-                .findFirst()
-                .ifPresent(et -> et.setDiagnostics(diagnostics));
+        for (Tab t : getTabs()) {
+            if (t instanceof EditorTab et && uri.equals(et.documentUri())) {
+                et.setDiagnostics(diagnostics);
+                return;
+            }
+        }
     }
 
     // --- Status ---

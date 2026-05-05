@@ -221,12 +221,8 @@ class EditorTab extends Tab {
         int line = lines.length - 1;
         int character = lines[lines.length - 1].length();
 
-        String uri;
-        if (filePath != null) {
-            uri = filePath.toUri().toString();
-        } else if (virtualUri != null) {
-            uri = virtualUri;
-        } else {
+        String uri = documentUri();
+        if (uri == null) {
             System.err.println("[Completion] No URI available");
             return;
         }
@@ -285,6 +281,11 @@ class EditorTab extends Tab {
 
         codeArea.replaceText(start, caretPos, insertText);
         codeArea.moveTo(start + insertText.length());
+    }
+
+    String documentUri() {
+        if (filePath != null) return filePath.toUri().toString();
+        return virtualUri;
     }
 
     void setModified(boolean value) {
