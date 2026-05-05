@@ -74,7 +74,7 @@ public class BranchesDialog {
 
         VBox root = new VBox(12);
         root.setPadding(new Insets(16));
-        root.setPrefWidth(500);
+        root.setPrefWidth(600);
         root.setPrefHeight(450);
 
         // Search field
@@ -239,15 +239,36 @@ public class BranchesDialog {
         confirmDialog.setContentText("This action cannot be undone.");
 
         Optional<ButtonType> result = confirmDialog.showAndWait();
-        if (result.isPresent() && result.get() == ButtonType.OK) {
-            if (gitManager.deleteBranch(branchName)) {
-                showInfo("Branch '" + branchName + "' deleted successfully");
+        if (result.isEmpty() || result.get() != ButtonType.OK) return;
+
+        Optional<String> error = gitManager.deleteBranch(branchName);
+        if (error.isEmpty()) {
+            showInfo("Branch '" + branchName + "' deleted successfully.");
+            refreshBranches();
+            notifyBranchChange();
+        } else {
+            showError(error.get());
+        }
+    }
+
+    private void forceDeleteBranch(String branchName) {
+        Alert confirmDialog = new Alert(AlertType.WARNING);
+        confirmDialog.setTitle("Force Delete Branch");
+        confirmDialog.setHeaderText("Force-delete '" + branchName + "'?");
+        confirmDialog.setContentText("This branch may have unmerged commits that will be permanently lost.");
+        confirmDialog.getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+
+        confirmDialog.showAndWait().ifPresent(type -> {
+            if (type != ButtonType.OK) return;
+            Optional<String> error = gitManager.forceDeleteBranch(branchName);
+            if (error.isEmpty()) {
+                showInfo("Branch '" + branchName + "' force-deleted successfully.");
                 refreshBranches();
                 notifyBranchChange();
             } else {
-                showError("Failed to delete branch '" + branchName + "'.\nMake sure it's not the current branch.");
+                showError(error.get());
             }
-        }
+        });
     }
 
     /**
@@ -336,7 +357,12 @@ public class BranchesDialog {
             deleteButton.setDisable(isCurrent);
             deleteButton.setOnAction(e -> deleteBranch(branchName));
 
-            box.getChildren().addAll(nameLabel, spacer, checkoutButton, createFromButton, deleteButton);
+            Button forceDeleteButton = new Button("Force Delete");
+            forceDeleteButton.setStyle("-fx-padding: 2 8 2 8; -fx-font-size: 10px; -fx-text-fill: #d32f2f;");
+            forceDeleteButton.setDisable(isCurrent);
+            forceDeleteButton.setOnAction(e -> forceDeleteBranch(branchName));
+
+            box.getChildren().addAll(nameLabel, spacer, checkoutButton, createFromButton, deleteButton, forceDeleteButton);
             setGraphic(box);
         }
     }
