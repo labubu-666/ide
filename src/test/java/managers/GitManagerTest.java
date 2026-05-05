@@ -419,35 +419,87 @@ public class GitManagerTest {
     @Test
     public void testDeleteBranch() {
         assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
-        
+
         // Create and switch to a new branch
         String branchToDelete = "feature-to-delete";
         manager.createBranch(branchToDelete);
-        
+
         // Switch back to main/master to delete the feature branch
         String currentBranch = manager.getCurrentBranch().orElse("");
         manager.checkoutBranch(currentBranch);
-        
-        boolean result = manager.deleteBranch(branchToDelete);
-        assertThat(result).as("Should successfully delete branch").isTrue();
-        
+
+        assertThat(manager.deleteBranch(branchToDelete)).as("Should successfully delete branch").isEmpty();
+
         List<String> branches = manager.getBranches();
         assertThat(branches).as("Should not contain deleted branch").doesNotContain(branchToDelete);
     }
 
     /**
-     * Test that deleting the current branch should fail.
+     * Test that deleting the current branch returns an appropriate error message.
      */
     @Test
     public void testDeleteCurrentBranch() {
         assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
-        
+
         String currentBranch = manager.getCurrentBranch().orElse("");
-        
-        boolean result = manager.deleteBranch(currentBranch);
-        assertThat(result).as("Should fail to delete current branch").isFalse();
-        
+
+        var error = manager.deleteBranch(currentBranch);
+        assertThat(error).as("Should fail to delete current branch").isPresent();
+        assertThat(error.get()).as("Error should mention the branch is checked out").contains(currentBranch);
+
         List<String> branches = manager.getBranches();
         assertThat(branches).as("Current branch should still exist").contains(currentBranch);
+    }
+
+    /**
+     * Test that force-deleting an unmerged branch succeeds.
+     */
+    @Test
+    public void testForceDeleteUnmergedBranch() throws Exception {
+        assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
+
+        String baseBranch = manager.getCurrentBranch().orElse("");
+
+        String unmergedBranch = "feature-force-delete";
+        manager.createAndCheckoutBranch(unmergedBranch);
+        Path testFile = repo.resolve("force-delete-file.txt");
+        Files.writeString(testFile, "unmerged content");
+        manager.stageFile(testFile);
+        manager.commit("Commit only on force-delete branch");
+
+        manager.checkoutBranch(baseBranch);
+
+        // Safe delete should fail
+        assertThat(manager.deleteBranch(unmergedBranch)).as("Safe delete should fail for unmerged branch").isPresent();
+
+        // Force delete should succeed
+        assertThat(manager.forceDeleteBranch(unmergedBranch)).as("Force delete should succeed").isEmpty();
+
+        assertThat(manager.getBranches()).as("Branch should be gone after force delete").doesNotContain(unmergedBranch);
+    }
+
+    /**
+     * Test that deleting an unmerged branch returns an appropriate error message.
+     */
+    @Test
+    public void testDeleteUnmergedBranch() throws Exception {
+        assertThat(manager.isGitRepository()).as("Should be in a git repository").isTrue();
+
+        String baseBranch = manager.getCurrentBranch().orElse("");
+
+        // Create a new branch with a commit not merged into base
+        String unmergedBranch = "feature-unmerged";
+        manager.createAndCheckoutBranch(unmergedBranch);
+        Path testFile = repo.resolve("unmerged-file.txt");
+        Files.writeString(testFile, "unmerged content");
+        manager.stageFile(testFile);
+        manager.commit("Commit only on unmerged branch");
+
+        // Switch back to base — unmergedBranch now has commits not in base
+        manager.checkoutBranch(baseBranch);
+
+        var error = manager.deleteBranch(unmergedBranch);
+        assertThat(error).as("Should fail to delete unmerged branch").isPresent();
+        assertThat(error.get()).as("Error should mention unmerged").containsIgnoringCase("merged");
     }
 }

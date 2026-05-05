@@ -14,6 +14,7 @@ import java.util.Optional;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.NotMergedException;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
@@ -549,26 +550,51 @@ public class GitManager {
      * Deletes a branch.
      *
      * @param branchName name of the branch to delete
-     * @return true if successful, false otherwise
+     * @return empty Optional on success, or an Optional containing a user-facing error message
      */
-    public boolean deleteBranch(String branchName) {
+    public Optional<String> deleteBranch(String branchName) {
         if (!isGitRepo || git == null || branchName == null || branchName.trim().isEmpty()) {
-            return false;
+            return Optional.of("Cannot delete branch: invalid state.");
         }
 
-        // Prevent deleting the current branch
         Optional<String> currentBranch = getCurrentBranch();
         if (currentBranch.isPresent() && currentBranch.get().equals(branchName)) {
-            System.err.println("[Git] Cannot delete the current branch: " + branchName);
-            return false;
+            return Optional.of("Cannot delete '" + branchName + "': it is the currently checked-out branch.");
         }
 
         try {
             git.branchDelete().setBranchNames(branchName).setForce(false).call();
-            return true;
+            return Optional.empty();
+        } catch (NotMergedException e) {
+            return Optional.of("Branch '" + branchName + "' has not been fully merged into the current branch.");
         } catch (GitAPIException e) {
             System.err.println("[Git] Error deleting branch: " + e.getMessage());
-            return false;
+            return Optional.of("Failed to delete '" + branchName + "': " + e.getMessage());
+        }
+    }
+
+    /**
+     * Force-deletes a branch, even if it has unmerged commits.
+     *
+     * @param branchName name of the branch to force-delete
+     * @return empty Optional on success, or an Optional containing a user-facing error message
+     */
+    public Optional<String> forceDeleteBranch(String branchName) {
+        if (!isGitRepo || git == null || branchName == null || branchName.trim().isEmpty()) {
+            return Optional.of("Cannot delete branch: invalid state.");
+        }
+
+        Optional<String> currentBranch = getCurrentBranch();
+        if (currentBranch.isPresent() && currentBranch.get().equals(branchName)) {
+            return Optional.of("Cannot delete '" + branchName + "': it is the currently checked-out branch.");
+        }
+
+        try {
+            git.branchDelete().setBranchNames(branchName).setForce(true).call();
+            return Optional.empty();
+        } catch (GitAPIException e) {
+            System.err.println("[Git] Error force-deleting branch: " + e.getMessage());
+            return Optional.of("Failed to force-delete '" + branchName + "': " + e.getMessage());
         }
     }
 
