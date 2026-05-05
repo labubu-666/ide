@@ -302,12 +302,16 @@ public class BranchesDialog {
             HBox box = new HBox(8);
             box.setPadding(new Insets(4, 8, 4, 8));
             box.setAlignment(Pos.CENTER_LEFT);
+            box.maxWidthProperty().bind(widthProperty());
 
             // Branch name label
             Label nameLabel = new Label(branchName);
+            nameLabel.setTooltip(new javafx.scene.control.Tooltip(branchName));
+            nameLabel.setMinWidth(0);
+            nameLabel.setMaxWidth(200);
             Optional<String> currentBranch = gitManager.getCurrentBranch();
             boolean isCurrent = currentBranch.isPresent() && currentBranch.get().equals(branchName);
-            
+
             if (isCurrent) {
                 nameLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #007acc;");
             } else {
