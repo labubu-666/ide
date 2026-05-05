@@ -48,15 +48,10 @@ public class SettingsDialog {
         stage.setResizable(true);
 
         // --- Python tab content ---
-        Label interpLabel = new Label("Interpreter path:");
+        Label interpLabel = new Label("Interpreter command:");
 
          interpreterField = new TextField(Settings.get(Settings.SettingKey.PYTHON_INTERPRETER));
          HBox.setHgrow(interpreterField, Priority.ALWAYS);
-
-         Button browseInterpBtn = new Button("Browse...");
-         browseInterpBtn.setOnAction(e -> browse("Select Python Interpreter", interpreterField));
-
-         HBox interpreterRow = new HBox(8, interpreterField, browseInterpBtn);
 
          interpreterOutputArea = new TextArea();
          interpreterOutputArea.setEditable(false);
@@ -65,17 +60,12 @@ public class SettingsDialog {
          interpreterOutputArea.setStyle("-fx-font-family: monospace; -fx-font-size: 12px;");
 
          Button testInterpBtn = new Button("Test");
-         testInterpBtn.setOnAction(e -> testExecutable(interpreterField, interpreterOutputArea));
+         testInterpBtn.setOnAction(e -> testCommand(interpreterField, interpreterOutputArea));
 
-         Label pylspLabel = new Label("pylsp path:");
+         Label pylspLabel = new Label("Language server command:");
 
          pylspField = new TextField(Settings.get(Settings.SettingKey.PYLSP_PATH));
         HBox.setHgrow(pylspField, Priority.ALWAYS);
-
-        Button browsePylspBtn = new Button("Browse...");
-        browsePylspBtn.setOnAction(e -> browse("Select pylsp Executable", pylspField));
-
-        HBox pylspRow = new HBox(8, pylspField, browsePylspBtn);
 
         pylspOutputArea = new TextArea();
         pylspOutputArea.setEditable(false);
@@ -84,15 +74,15 @@ public class SettingsDialog {
         pylspOutputArea.setStyle("-fx-font-family: monospace; -fx-font-size: 12px;");
 
         Button testPylspBtn = new Button("Test");
-        testPylspBtn.setOnAction(e -> testExecutable(pylspField, pylspOutputArea));
+        testPylspBtn.setOnAction(e -> testCommand(pylspField, pylspOutputArea));
 
         VBox pythonContent = new VBox(6,
                 interpLabel,
-                interpreterRow,
+                interpreterField,
                 testInterpBtn,
                 interpreterOutputArea,
                 pylspLabel,
-                pylspRow,
+                pylspField,
                 testPylspBtn,
                 pylspOutputArea);
         pythonContent.setPadding(new Insets(12));
@@ -363,46 +353,5 @@ public class SettingsDialog {
         thread.setDaemon(true);
         thread.start();
     }
-
-    private void testExecutable(TextField field, TextArea output) {
-        String path = field.getText().strip();
-        if (path.isEmpty()) {
-            output.setText("No path specified.");
-            output.setStyle("-fx-font-family: monospace; -fx-font-size: 12px; -fx-text-fill: red;");
-            return;
-        }
-
-        output.setText("Testing...");
-        output.setStyle("-fx-font-family: monospace; -fx-font-size: 12px;");
-
-        Thread thread = new Thread(() -> {
-            try {
-                ProcessBuilder pb = new ProcessBuilder(path, "--version");
-                pb.redirectErrorStream(true);
-                Process process = pb.start();
-                String result;
-                try (BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(process.getInputStream()))) {
-                    result = reader.lines().collect(Collectors.joining("\n")).strip();
-                }
-                int exitCode = process.waitFor();
-                if (result.isEmpty()) result = "(no output)";
-                if (exitCode != 0) result += "\n[exit code: " + exitCode + "]";
-                String finalResult = result;
-                boolean success = exitCode == 0;
-                Platform.runLater(() -> {
-                    output.setText(finalResult);
-                    output.setStyle("-fx-font-family: monospace; -fx-font-size: 12px; -fx-text-fill: "
-                            + (success ? "green" : "red") + ";");
-                });
-            } catch (Exception ex) {
-                Platform.runLater(() -> {
-                    output.setText("Error: " + ex.getMessage());
-                    output.setStyle("-fx-font-family: monospace; -fx-font-size: 12px; -fx-text-fill: red;");
-                });
-            }
-        }, "executable-test");
-        thread.setDaemon(true);
-        thread.start();
-    }
 }
+
