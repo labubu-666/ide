@@ -306,8 +306,7 @@ public class SettingsDialog {
         }
     }
 
-    // For full command strings (e.g. "npx --yes typescript-language-server --stdio"):
-    // replaces --stdio with --version to probe the server.
+    // Probes a command by stripping --stdio (if present) and appending --version.
     private void testCommand(TextField field, TextArea output) {
         String raw = field.getText().strip();
         if (raw.isEmpty()) {
