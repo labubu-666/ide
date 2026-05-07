@@ -33,6 +33,9 @@ public class DiffEditorTab extends javafx.scene.control.Tab {
     private final CodeArea leftArea;
     private final CodeArea rightArea;
 
+    private List<DiffComputer.Hunk> currentHunks = new ArrayList<>();
+    private int currentHunkIndex = -1;
+
     public DiffEditorTab(Path filePath, EditorContext ctx, managers.GitManager gitManager) {
         super("Diff - " + filePath.getFileName().toString());
         this.filePath = filePath;
@@ -69,6 +72,12 @@ public class DiffEditorTab extends javafx.scene.control.Tab {
     }
 
     private ToolBar buildActionBar() {
+        Button prevChange = new Button("▲");
+        prevChange.setTooltip(new javafx.scene.control.Tooltip("Previous change"));
+        prevChange.setOnAction(e -> navigateHunk(-1));
+        Button nextChange = new Button("▼");
+        nextChange.setTooltip(new javafx.scene.control.Tooltip("Next change"));
+        nextChange.setOnAction(e -> navigateHunk(1));
         Button refresh = new Button("Refresh");
         refresh.setOnAction(e -> loadContents());
         Button stageAll = new Button("Stage All");
@@ -89,7 +98,25 @@ public class DiffEditorTab extends javafx.scene.control.Tab {
         Button jumpToFile = new Button("Jump to File");
         jumpToFile.setOnAction(e -> ctx.onOpenFile().accept(filePath));
 
-        return new ToolBar(refresh, stageAll, revert, revertSelection, jumpToFile);
+        return new ToolBar(prevChange, nextChange, refresh, stageAll, revert, revertSelection, jumpToFile);
+    }
+
+    private void navigateHunk(int direction) {
+        if (currentHunks.isEmpty()) return;
+        if (currentHunkIndex < 0) {
+            currentHunkIndex = direction > 0 ? 0 : currentHunks.size() - 1;
+        } else {
+            currentHunkIndex = Math.floorMod(currentHunkIndex + direction, currentHunks.size());
+        }
+        DiffComputer.Hunk hunk = currentHunks.get(currentHunkIndex);
+        int rightLine = Math.max(0, hunk.newStart() - 1);
+        int leftLine = Math.max(0, hunk.oldStart() - 1);
+        int rightTarget = Math.min(rightLine, Math.max(0, rightArea.getParagraphs().size() - 1));
+        int leftTarget = Math.min(leftLine, Math.max(0, leftArea.getParagraphs().size() - 1));
+        rightArea.moveTo(rightTarget, 0);
+        rightArea.requestFollowCaret();
+        rightArea.showParagraphAtTop(Math.max(0, rightTarget - 2));
+        leftArea.showParagraphAtTop(Math.max(0, leftTarget - 2));
     }
 
     private void revertSelection() {
@@ -236,6 +263,8 @@ public class DiffEditorTab extends javafx.scene.control.Tab {
             
             // Compute diff hunks and apply diff styling
             List<DiffComputer.Hunk> hunks = diffComputer != null ? diffComputer.computeLineHunks(head, work) : new ArrayList<>();
+            currentHunks = hunks;
+            currentHunkIndex = -1;
             
             // Merge syntax highlighting with diff highlighting
             if (!hunks.isEmpty()) {
