@@ -1,7 +1,33 @@
 .diff-added {
+    background-color: #c8e6c9;
     -rtfx-background-color: #c8e6c9;
 }
 
 .diff-deleted {
+    background-color: #ffcdd2;
     -rtfx-background-color: #ffcdd2;
+}
+
+.diff-placeholder-left {
+    background-color: #e8e8e8;
+    -rtfx-background-color: #e8e8e8;
+}
+
+.diff-placeholder-right {
+    background-color: #e8e8e8;
+    -rtfx-background-color: #e8e8e8;
+}
+
+.diff-placeholder-row-left,
+.paragraph-box.diff-placeholder-row-left {
+    background-color: #e8e8e8;
+    -fx-background-color: #e8e8e8;
+    -fx-background-insets: 0;
+}
+
+.diff-placeholder-row-right,
+.paragraph-box.diff-placeholder-row-right {
+    background-color: #e8e8e8;
+    -fx-background-color: #e8e8e8;
+    -fx-background-insets: 0;
 }

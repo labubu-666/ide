@@ -21,6 +21,11 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 public class DiffComputer {
 
     public static record Hunk(int oldStart, int oldLines, int newStart, int newLines, List<String> oldLinesText, List<String> newLinesText) {}
+    public static record AlignedRow(int leftLineNumber, int rightLineNumber,
+                                    String leftText, String rightText,
+                                    boolean leftPlaceholder, boolean rightPlaceholder,
+                                    boolean changed) {}
+    public static record AlignedDiff(List<AlignedRow> rows, List<Integer> hunkRowStarts) {}
 
     private final Repository repo;
     private final Path repoRoot; // absolute path to the working-tree root
@@ -129,5 +134,77 @@ public class DiffComputer {
             }
         }
         return hunks;
+    }
+
+    public AlignedDiff alignForSideBySide(String oldText, String newText, List<Hunk> hunks) {
+        String[] oldLines = oldText.split("\n", -1);
+        String[] newLines = newText.split("\n", -1);
+        List<AlignedRow> rows = new ArrayList<>();
+        List<Integer> hunkRowStarts = new ArrayList<>();
+
+        int oldIndex = 0;
+        int newIndex = 0;
+
+        for (Hunk hunk : hunks) {
+            int oldStartIndex = Math.max(0, hunk.oldStart() - 1);
+            int newStartIndex = Math.max(0, hunk.newStart() - 1);
+
+            while (oldIndex < oldStartIndex && newIndex < newStartIndex) {
+                rows.add(new AlignedRow(oldIndex + 1, newIndex + 1,
+                        oldLines[oldIndex], newLines[newIndex], false, false, false));
+                oldIndex++;
+                newIndex++;
+            }
+            while (oldIndex < oldStartIndex) {
+                rows.add(new AlignedRow(oldIndex + 1, -1,
+                        oldLines[oldIndex], "", false, true, true));
+                oldIndex++;
+            }
+            while (newIndex < newStartIndex) {
+                rows.add(new AlignedRow(-1, newIndex + 1,
+                        "", newLines[newIndex], true, false, true));
+                newIndex++;
+            }
+
+            hunkRowStarts.add(rows.size());
+
+            int oldCount = Math.max(0, hunk.oldLines());
+            int newCount = Math.max(0, hunk.newLines());
+            int rowsInHunk = Math.max(oldCount, newCount);
+            for (int i = 0; i < rowsInHunk; i++) {
+                boolean hasLeft = i < oldCount && oldIndex + i < oldLines.length;
+                boolean hasRight = i < newCount && newIndex + i < newLines.length;
+
+                int leftLineNumber = hasLeft ? oldIndex + i + 1 : -1;
+                int rightLineNumber = hasRight ? newIndex + i + 1 : -1;
+                String leftText = hasLeft ? oldLines[oldIndex + i] : "";
+                String rightText = hasRight ? newLines[newIndex + i] : "";
+
+                rows.add(new AlignedRow(leftLineNumber, rightLineNumber,
+                        leftText, rightText, !hasLeft, !hasRight, true));
+            }
+
+            oldIndex += oldCount;
+            newIndex += newCount;
+        }
+
+        while (oldIndex < oldLines.length && newIndex < newLines.length) {
+            rows.add(new AlignedRow(oldIndex + 1, newIndex + 1,
+                    oldLines[oldIndex], newLines[newIndex], false, false, false));
+            oldIndex++;
+            newIndex++;
+        }
+        while (oldIndex < oldLines.length) {
+            rows.add(new AlignedRow(oldIndex + 1, -1,
+                    oldLines[oldIndex], "", false, true, true));
+            oldIndex++;
+        }
+        while (newIndex < newLines.length) {
+            rows.add(new AlignedRow(-1, newIndex + 1,
+                    "", newLines[newIndex], true, false, true));
+            newIndex++;
+        }
+
+        return new AlignedDiff(List.copyOf(rows), List.copyOf(hunkRowStarts));
     }
 }
