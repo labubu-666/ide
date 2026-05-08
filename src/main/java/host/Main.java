@@ -197,7 +197,22 @@ public class Main extends Application {
 
     private void onDiffActivated() {
         Scene scene = primaryStage.getScene();
-        if (scene != null) scene.getStylesheets().clear();
+        if (scene == null) return;
+
+        scene.getStylesheets().clear();
+
+        String extension = "";
+        var selected = centerPanel.getSelectionModel().getSelectedItem();
+        if (selected instanceof DiffEditorTab det && det.filePath != null) {
+            String name = det.filePath.getFileName().toString();
+            int dot = name.lastIndexOf('.');
+            if (dot > 0) extension = name.substring(dot + 1);
+        }
+
+        String sheet = Languages.forExtension(extension).stylesheetResource();
+        addStylesheet(scene, sheet);
+        addStylesheet(scene, "/host/keywords/lsp.css");
+        addStylesheet(scene, "/host/keywords/diff.css");
     }
 
     private void refreshStatus() {
@@ -217,8 +232,18 @@ public class Main extends Application {
         if (scene != null) {
             scene.getStylesheets().clear();
             String sheet = Languages.forExtension(extension).stylesheetResource();
-            scene.getStylesheets().add(Main.class.getResource(sheet).toExternalForm());
-            scene.getStylesheets().add(Main.class.getResource("/host/keywords/lsp.css").toExternalForm());
+            addStylesheet(scene, sheet);
+            addStylesheet(scene, "/host/keywords/lsp.css");
+        }
+    }
+
+    private void addStylesheet(Scene scene, String resourcePath) {
+        if (resourcePath == null) return;
+        var resource = Main.class.getResource(resourcePath);
+        if (resource == null) return;
+        String url = resource.toExternalForm();
+        if (!scene.getStylesheets().contains(url)) {
+            scene.getStylesheets().add(url);
         }
     }
 
