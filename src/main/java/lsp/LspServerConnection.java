@@ -36,7 +36,10 @@ public class LspServerConnection {
 
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.directory(workspaceRoot.toFile());
-        pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+        // Redirect stderr to stdout for debugging
+        pb.redirectErrorStream(true);
+        System.err.println("[LSP] ProcessBuilder command: " + command);
+        System.err.println("[LSP] Working directory: " + workspaceRoot.toAbsolutePath());
         Process process = pb.start();
 
         LspClient client = new LspClient(onDiagnostics);
