@@ -105,10 +105,10 @@ public class Main extends Application {
                 centerPanel::handleFileRenamed,
                 centerPanel::handleFileDeleted,
                 centerPanel::handleFileDiscarded,
-                pos -> mainSplitPane.setDividerPositions(pos, 0.75),
+                pos -> mainSplitPane.getDividers().get(0).setPosition(pos),
                 gitManager);
 
-        rightPanel = new RightPanel(pos -> mainSplitPane.setDividerPositions(0.20, pos));
+        rightPanel = new RightPanel(pos -> mainSplitPane.getDividers().get(1).setPosition(pos));
 
         mainSplitPane = new SplitPane(leftPanel, centerPanel, rightPanel);
         SplitPane.setResizableWithParent(leftPanel, Boolean.FALSE);
