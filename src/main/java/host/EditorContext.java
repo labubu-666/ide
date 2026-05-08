@@ -1,6 +1,5 @@
 package host;
 
-import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
@@ -14,5 +13,5 @@ record EditorContext(
     CompletionProvider completionProvider,
     PreviewRegistry previewRegistry,
     Consumer<EditorTab> onViewModeChanged,
-    Consumer<Path> onOpenFile
+    EditorNavigator navigator
 ) {}

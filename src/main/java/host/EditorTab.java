@@ -119,11 +119,6 @@ class EditorTab extends Tab {
             if (spans != null) codeArea.setStyleSpans(0, spans);
         }
 
-        Platform.runLater(() -> {
-            codeArea.moveTo(0);
-            codeArea.requestFollowCaret();
-        });
-
         // Initialize checksum for modification tracking
         this.originalChecksum = fileManager.calculateChecksum(initialText);
         this.fileLastModifiedTime = 0;
@@ -400,6 +395,23 @@ class EditorTab extends Tab {
         return virtualUri;
     }
 
+    void revealPosition(int lineNumber, int column) {
+        int paragraphCount = codeArea.getParagraphs().size();
+        if (paragraphCount <= 0) {
+            codeArea.moveTo(0);
+            codeArea.requestFollowCaret();
+            return;
+        }
+
+        int targetParagraph = Math.max(0, Math.min(lineNumber - 1, paragraphCount - 1));
+        int maxColumn = codeArea.getParagraph(targetParagraph).length();
+        int targetColumn = Math.max(0, Math.min(column, maxColumn));
+
+        codeArea.moveTo(targetParagraph, targetColumn);
+        codeArea.requestFollowCaret();
+        codeArea.showParagraphAtTop(Math.max(0, targetParagraph - 2));
+    }
+
     void setModified(boolean value) {
         this.modified = value;
         setText(value ? "*" + baseTitle : baseTitle);
@@ -473,7 +485,7 @@ class EditorTab extends Tab {
 
     private void buildPreviewNode() {
         ctx.previewRegistry().forExtension(extension)
-            .ifPresent(r -> cachedPreviewNode = r.render(codeArea.getText(), filePath, ctx.onOpenFile()));
+            .ifPresent(r -> cachedPreviewNode = r.render(codeArea.getText(), filePath, ctx.navigator()));
     }
 
     void setDiagnostics(List<Diagnostic> diagnostics) {

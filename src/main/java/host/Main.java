@@ -33,6 +33,7 @@ import lsp.CompletionProvider;
 import lsp.DocumentManager;
 import lsp.LspServerRegistry;
 import preview.PreviewRegistry;
+import search.SearchService;
 import settings.SettingsDialog;
 import utils.FileUtils;
 
@@ -78,6 +79,8 @@ public class Main extends Application {
         }
 
         Settings.load(rootPath);
+        // TODO: Temporarily synchronous due to lack of backgroiund jobs feature - will be made async later
+        SearchService.initializeIndex(rootPath);
         gitManager = new GitManager(rootPath);
         lspRegistry = new LspServerRegistry(rootPath, (uri, diagnostics) ->
             Platform.runLater(() -> centerPanel.applyDiagnostics(uri, diagnostics)));
@@ -92,11 +95,12 @@ public class Main extends Application {
                 this::onDiffActivated,
                 this::refreshStatus,
                 this::refreshTree);
+        EditorNavigator navigator = centerPanel;
 
         MenuBar menuBar = buildMenuBar();
 
         leftPanel = new LeftPanel(rootPath, fileTypes,
-                centerPanel::openFile,
+                navigator,
                 centerPanel::openDiff,
                 centerPanel::handleFileRenamed,
                 centerPanel::handleFileDeleted,
@@ -122,6 +126,10 @@ public class Main extends Application {
         scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN).match(event)) {
                 centerPanel.saveActive();
+                event.consume();
+            } else if (new KeyCodeCombination(KeyCode.F,
+                    KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN).match(event)) {
+                new GlobalSearchDialog(primaryStage, rootPath, navigator::openSearchMatch).show();
                 event.consume();
             }
         });
