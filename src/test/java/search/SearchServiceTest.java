@@ -127,10 +127,10 @@ class SearchServiceTest {
         Files.writeString(file, "old-token");
         SearchService.initializeIndex(root);
 
-        Files.writeString(file, "new-token");
+        Files.writeString(file, "new-token-updated");
         SearchService.initializeIndex(root);
         List<SearchMatch> oldResults = new SearchService(root).search("old-token");
-        List<SearchMatch> newResults = new SearchService(root).search("new-token");
+        List<SearchMatch> newResults = new SearchService(root).search("new-token-updated");
 
         assertThat(oldResults).isEmpty();
         assertThat(newResults).singleElement().satisfies(m -> {
