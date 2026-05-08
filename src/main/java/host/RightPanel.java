@@ -40,9 +40,8 @@ class RightPanel extends HBox {
         sidebar.getChildren().add(tasksButton);
 
         contentArea = new StackPane();
-        Label tasksPlaceholder = new Label("Tasks - Coming Soon");
-        tasksPlaceholder.setStyle("-fx-text-fill: #999; -fx-font-size: 14px;");
-        contentArea.getChildren().add(tasksPlaceholder);
+        contentArea.setVisible(false);
+        contentArea.setManaged(false);
 
         getChildren().addAll(contentArea, sidebar);
         HBox.setHgrow(contentArea, Priority.ALWAYS);
@@ -50,6 +49,7 @@ class RightPanel extends HBox {
     }
 
     private void selectTab(String tabId) {
+        boolean wasExpanded = expanded;
         if (selectedTab.equals(tabId)) {
             expanded = !expanded;
         } else {
@@ -57,9 +57,19 @@ class RightPanel extends HBox {
         }
         selectedTab = tabId;
 
-        onDividerChange.accept(expanded ? EXPANDED_DIVIDER : COLLAPSED_DIVIDER);
+        if (wasExpanded != expanded) {
+            onDividerChange.accept(expanded ? EXPANDED_DIVIDER : COLLAPSED_DIVIDER);
+        }
 
         tasksButton.setStyle("-fx-padding: 0; -fx-focus-color: transparent; -fx-faint-focus-color: transparent;");
+
+        contentArea.setVisible(expanded);
+        contentArea.setManaged(expanded);
+
+        if (!expanded) {
+            contentArea.getChildren().clear();
+            return;
+        }
 
         contentArea.getChildren().clear();
         if ("tasks".equals(tabId)) {

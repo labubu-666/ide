@@ -86,6 +86,7 @@ class LeftPanel extends HBox {
         VBox sidebar = new VBox();
         sidebar.setPrefWidth(24);
         sidebar.setMinWidth(24);
+        sidebar.setMaxWidth(24);
         sidebar.setSpacing(4);
 
         fileBrowserButton = createTabButton("File Browser", "/host/icons/document.png");
@@ -217,6 +218,7 @@ class LeftPanel extends HBox {
     }
 
     private void selectTab(String tabId) {
+        boolean wasExpanded = expanded;
         if (selectedTab.equals(tabId)) {
             expanded = !expanded;
         } else {
@@ -224,12 +226,22 @@ class LeftPanel extends HBox {
         }
         selectedTab = tabId;
 
-        onDividerChange.accept(expanded ? EXPANDED_DIVIDER : COLLAPSED_DIVIDER);
+        if (wasExpanded != expanded) {
+            onDividerChange.accept(expanded ? EXPANDED_DIVIDER : COLLAPSED_DIVIDER);
+        }
 
         String baseStyle = "-fx-padding: 0; -fx-focus-color: transparent; -fx-faint-focus-color: transparent;";
         fileBrowserButton.setStyle(baseStyle);
         sourceControlButton.setStyle(baseStyle);
         storeButton.setStyle(baseStyle);
+
+        contentArea.setVisible(expanded);
+        contentArea.setManaged(expanded);
+
+        if (!expanded) {
+            contentArea.getChildren().clear();
+            return;
+        }
 
         contentArea.getChildren().clear();
         switch (tabId) {
