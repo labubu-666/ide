@@ -96,7 +96,7 @@ public class DiffEditorTab extends javafx.scene.control.Tab {
         Button revertSelection = new Button("Revert Selection");
         revertSelection.setOnAction(e -> revertSelection());
         Button jumpToFile = new Button("Jump to File");
-        jumpToFile.setOnAction(e -> ctx.onOpenFile().accept(filePath));
+        jumpToFile.setOnAction(e -> ctx.navigator().openFile(filePath));
 
         return new ToolBar(prevChange, nextChange, refresh, stageAll, revert, revertSelection, jumpToFile);
     }

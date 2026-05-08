@@ -44,7 +44,7 @@ class LeftPanel extends HBox {
     private static final double COLLAPSED_DIVIDER = 0.025;
 
     private final FileTypeRegistry fileTypes;
-    private final Consumer<Path> onFileOpen;
+    private final EditorNavigator navigator;
     private final Consumer<Path> onOpenDiff;
     private final BiConsumer<Path, Path> onFileRenamed;
     private final Consumer<Path> onFileDeleted;
@@ -66,7 +66,7 @@ class LeftPanel extends HBox {
     private String selectedTab = "file-browser";
 
     LeftPanel(Path rootPath, FileTypeRegistry fileTypes,
-              Consumer<Path> onFileOpen,
+              EditorNavigator navigator,
               Consumer<Path> onOpenDiff,
               BiConsumer<Path, Path> onFileRenamed,
               Consumer<Path> onFileDeleted,
@@ -75,7 +75,7 @@ class LeftPanel extends HBox {
               GitManager gitManager) {
         this.rootPath = rootPath;
         this.fileTypes = fileTypes;
-        this.onFileOpen = onFileOpen;
+        this.navigator = navigator;
         this.onFileRenamed = onFileRenamed;
         this.onFileDeleted = onFileDeleted;
         this.onFileDiscarded = onFileDiscarded;
@@ -170,7 +170,7 @@ class LeftPanel extends HBox {
             if (newVal != null && newVal.isLeaf()) {
                 Path filePath = newVal.getValue().path();
                 if (filePath != null && Files.isRegularFile(filePath)) {
-                    onFileOpen.accept(filePath);
+                    navigator.openFile(filePath);
                 }
             }
         });
@@ -269,7 +269,7 @@ class LeftPanel extends HBox {
                 Files.createDirectories(newFile.getParent());
                 Files.createFile(newFile);
                 refreshTree();
-                onFileOpen.accept(newFile);
+                navigator.openFile(newFile);
             } catch (IOException e) {
                 new Alert(AlertType.ERROR, "Could not create file: " + e.getMessage()).showAndWait();
             }

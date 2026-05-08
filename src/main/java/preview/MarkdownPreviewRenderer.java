@@ -6,7 +6,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Locale;
-import java.util.function.Consumer;
+
+import host.EditorNavigator;
+import javafx.application.Platform;
+import javafx.concurrent.Worker;
+import javafx.scene.Node;
+import javafx.scene.web.WebEngine;
+import javafx.scene.web.WebView;
 
 import com.vladsch.flexmark.ext.autolink.AutolinkExtension;
 import com.vladsch.flexmark.ext.gfm.strikethrough.StrikethroughExtension;
@@ -17,12 +23,6 @@ import com.vladsch.flexmark.html.HtmlRenderer;
 import com.vladsch.flexmark.parser.Parser;
 import com.vladsch.flexmark.util.ast.Document;
 import com.vladsch.flexmark.util.data.MutableDataSet;
-
-import javafx.application.Platform;
-import javafx.concurrent.Worker;
-import javafx.scene.Node;
-import javafx.scene.web.WebEngine;
-import javafx.scene.web.WebView;
 
 public class MarkdownPreviewRenderer implements PreviewRenderer {
 
@@ -79,7 +79,7 @@ public class MarkdownPreviewRenderer implements PreviewRenderer {
     }
 
     @Override
-    public Node render(String text, Path source, Consumer<Path> fileNavigator) {
+    public Node render(String text, Path source, EditorNavigator navigator) {
         WebView webView = new WebView();
         webView.setContextMenuEnabled(false);
         String html = renderToHtml(text);
@@ -91,7 +91,7 @@ public class MarkdownPreviewRenderer implements PreviewRenderer {
             String data = event.getData();
             if (!data.startsWith("NAVIGATE:")) return;
             String url = data.substring(9);
-            handleUrl(url, source, fileNavigator);
+            handleUrl(url, source, navigator);
         });
 
         // Inject click interceptors once the page has finished loading
@@ -112,14 +112,14 @@ public class MarkdownPreviewRenderer implements PreviewRenderer {
         return webView;
     }
 
-    private void handleUrl(String url, Path source, Consumer<Path> fileNavigator) {
+    private void handleUrl(String url, Path source, EditorNavigator navigator) {
         if (url.startsWith("http://") || url.startsWith("https://")) {
             try {
                 Desktop.getDesktop().browse(new URI(url));
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        } else if (fileNavigator != null) {
+        } else if (navigator != null) {
             try {
                 Path target;
                 if (url.startsWith("file:")) {
@@ -131,7 +131,7 @@ public class MarkdownPreviewRenderer implements PreviewRenderer {
                 target = target.normalize();
                 if (Files.exists(target)) {
                     Path resolved = target;
-                    Platform.runLater(() -> fileNavigator.accept(resolved));
+                    Platform.runLater(() -> navigator.openFile(resolved));
                 }
             } catch (Exception e) {
                 e.printStackTrace();

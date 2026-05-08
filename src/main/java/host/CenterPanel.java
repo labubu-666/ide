@@ -26,10 +26,9 @@ import lsp.DocumentManager;
 import managers.FileManager;
 import managers.GitManager;
 import preview.PreviewRegistry;
-
 import java.util.concurrent.ExecutorService;
 
-class CenterPanel extends TabPane {
+class CenterPanel extends TabPane implements EditorNavigator {
 
     private final Path rootPath;
     private final EditorContext editorCtx;
@@ -60,7 +59,7 @@ class CenterPanel extends TabPane {
         this.onTreeRefreshNeeded = onTreeRefreshNeeded;
 
         this.editorCtx = new EditorContext(executor, docManager, completionProvider, previewRegistry,
-                this::handleViewModeChanged, this::openFile);
+                this::handleViewModeChanged, this);
 
         setTabClosingPolicy(TabClosingPolicy.ALL_TABS);
 
@@ -88,12 +87,20 @@ class CenterPanel extends TabPane {
         addAndSelect(tab);
     }
 
-    void openFile(Path path) {
+    @Override
+    public void openEditor(EditorNavigationTarget target) {
+        EditorTab tab = openOrCreateEditorTab(target.filePath());
+        if (target.hasPosition()) {
+            tab.revealPosition(target.lineNumber(), target.column());
+        }
+    }
+
+    private EditorTab openOrCreateEditorTab(Path path) {
         Path absolutePath = path.isAbsolute() ? path : rootPath.resolve(path);
         var existing = findEditorTab(absolutePath);
         if (existing.isPresent()) {
             getSelectionModel().select(existing.get());
-            return;
+            return existing.get();
         }
         String fileName = absolutePath.getFileName().toString();
         int dot = fileName.lastIndexOf('.');
@@ -105,8 +112,10 @@ class CenterPanel extends TabPane {
             tab.initializeWithFileContent(fileContent);
             addAndSelect(tab);
             docManager.didOpen(absolutePath, fileContent.getContent(), Languages.forExtension(ext).languageId());
+            return tab;
         } catch (IOException e) {
             e.printStackTrace();
+            throw new RuntimeException("Failed to open file: " + absolutePath, e);
         }
     }
 
