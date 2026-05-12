@@ -9,8 +9,9 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.ListCell;
-import javafx.scene.control.ListView;
+import javafx.scene.control.TreeCell;
+import javafx.scene.control.TreeItem;
+import javafx.scene.control.TreeView;
 import javafx.geometry.Pos;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TitledPane;
@@ -91,8 +92,8 @@ public class SourceControlPanel extends ScrollPane {
     private final Consumer<Void> onRefresh;
     private final Consumer<Path> onOpenDiff;
     private final Consumer<Path> onFileDiscarded;
-    private ListView<FileChange> changesView;
-    private ListView<FileChange> stagedView;
+    private TreeView<ChangeTreeNode> changesTree;
+    private TreeView<ChangeTreeNode> stagedTree;
     private TitledPane unstagedPane;
     private TitledPane stagedPane;
     private TextArea messageArea;
@@ -107,6 +108,9 @@ public class SourceControlPanel extends ScrollPane {
         }
     }
 
+    private record ChangeTreeNode(String name, boolean folder, FileChange change) {
+    }
+
     public SourceControlPanel(GitManager gitManager, Consumer<Void> onRefresh, Consumer<Path> onOpenDiff, Consumer<Path> onFileDiscarded) {
         this.gitManager = gitManager;
         this.onRefresh = onRefresh;
@@ -118,8 +122,8 @@ public class SourceControlPanel extends ScrollPane {
         content.setStyle("-fx-background-color: #ffffff;");
 
         // Initialize fields to null - will be properly initialized if this is a git repo
-        this.changesView = null;
-        this.stagedView = null;
+        this.changesTree = null;
+        this.stagedTree = null;
         this.messageArea = null;
         this.commitButton = null;
         this.amendButton = null;
@@ -166,20 +170,20 @@ public class SourceControlPanel extends ScrollPane {
         unstagedPane.setText("Changes");
         unstagedPane.setCollapsible(true);
         unstagedPane.setExpanded(true);
-        changesView = new ListView<>();
-        changesView.setPrefHeight(150);
-        changesView.setCellFactory(lv -> createFileCell(false));
-        unstagedPane.setContent(changesView);
+        changesTree = new TreeView<>();
+        changesTree.setShowRoot(false);
+        changesTree.setCellFactory(tv -> createTreeCell(false));
+        unstagedPane.setContent(changesTree);
 
         // Staged changes section
         stagedPane = new TitledPane();
         stagedPane.setText("Staged Changes");
         stagedPane.setCollapsible(true);
         stagedPane.setExpanded(true);
-        stagedView = new ListView<>();
-        stagedView.setPrefHeight(150);
-        stagedView.setCellFactory(lv -> createFileCell(true));
-        stagedPane.setContent(stagedView);
+        stagedTree = new TreeView<>();
+        stagedTree.setShowRoot(false);
+        stagedTree.setCellFactory(tv -> createTreeCell(true));
+        stagedPane.setContent(stagedTree);
 
         content.getChildren().addAll(
             header,
@@ -189,8 +193,8 @@ public class SourceControlPanel extends ScrollPane {
             unstagedPane
         );
 
-        VBox.setVgrow(changesView, Priority.SOMETIMES);
-        VBox.setVgrow(stagedView, Priority.SOMETIMES);
+        VBox.setVgrow(changesTree, Priority.SOMETIMES);
+        VBox.setVgrow(stagedTree, Priority.SOMETIMES);
         VBox.setVgrow(messageArea, Priority.SOMETIMES);
 
         setContent(content);
@@ -220,21 +224,19 @@ public class SourceControlPanel extends ScrollPane {
      * Refresh the file status from git.
      */
     public void refreshStatus() {
+        if (changesTree == null || stagedTree == null) {
+            return;
+        }
+
         Map<Path, String> unstaged = gitManager.getUnstagedChanges();
         Map<Path, String> staged = gitManager.getStagedChanges();
 
-        changesView.getItems().clear();
-        for (Map.Entry<Path, String> entry : unstaged.entrySet()) {
-            changesView.getItems().add(new FileChange(entry.getKey(), entry.getValue(), false));
-        }
+        changesTree.setRoot(buildTree(unstaged, false));
         // Hide/show unstaged changes section
         unstagedPane.setVisible(!unstaged.isEmpty());
         unstagedPane.setManaged(!unstaged.isEmpty());
 
-        stagedView.getItems().clear();
-        for (Map.Entry<Path, String> entry : staged.entrySet()) {
-            stagedView.getItems().add(new FileChange(entry.getKey(), entry.getValue(), true));
-        }
+        stagedTree.setRoot(buildTree(staged, true));
         // Hide/show staged changes section
         stagedPane.setVisible(!staged.isEmpty());
         stagedPane.setManaged(!staged.isEmpty());
@@ -243,10 +245,10 @@ public class SourceControlPanel extends ScrollPane {
     /**
      * Create a custom cell renderer for file changes with status indicators and context menu.
      */
-    private ListCell<FileChange> createFileCell(boolean isStaged) {
-        return new ListCell<FileChange>() {
+    private TreeCell<ChangeTreeNode> createTreeCell(boolean isStaged) {
+        return new TreeCell<ChangeTreeNode>() {
             @Override
-            protected void updateItem(FileChange item, boolean empty) {
+            protected void updateItem(ChangeTreeNode item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
                     setText(null);
@@ -254,34 +256,33 @@ public class SourceControlPanel extends ScrollPane {
                     return;
                 }
 
+                if (item.folder) {
+                    setText(item.name);
+                    setGraphic(null);
+                    return;
+                }
+
+                FileChange fileChange = item.change;
+
                 HBox box = new HBox(8);
                 box.setPadding(new Insets(4, 8, 4, 8));
                 box.setAlignment(Pos.CENTER_LEFT);
 
-                Label statusLabel = new Label(item.status);
+                Label statusLabel = new Label(fileChange.status);
                 statusLabel.setPrefWidth(30);
-                statusLabel.setStyle(getStatusStyle(item.status));
+                statusLabel.setStyle(getStatusStyle(fileChange.status));
 
-                Label fileLabel = new Label(item.path.getFileName().toString());
+                Label fileLabel = new Label(fileChange.path.getFileName().toString());
                 fileLabel.setStyle("-fx-text-fill: #333;");
-
-                Path parent = item.path.getParent();
-                Label pathLabel = new Label(parent != null && parent.getFileName() != null
-                    ? parent.getFileName().toString()
-                    : "(root)");
-                pathLabel.setStyle("-fx-text-fill: #999; -fx-font-size: 10px;");
-
-                VBox details = new VBox(0);
-                details.getChildren().addAll(fileLabel, pathLabel);
 
                 // Add/Remove button
                 Button actionButton = new Button(isStaged ? "Remove" : "Add");
                 actionButton.setStyle("-fx-padding: 2 5 2 5; -fx-font-size: 10px;");
                 actionButton.setOnAction(e -> {
                     if (isStaged) {
-                        gitManager.unstageFile(item.path);
+                        gitManager.unstageFile(fileChange.path);
                     } else {
-                        gitManager.stageFile(item.path);
+                        gitManager.stageFile(fileChange.path);
                     }
                     refreshStatus();
                     if (onRefresh != null) onRefresh.accept(null);
@@ -295,8 +296,8 @@ public class SourceControlPanel extends ScrollPane {
                     Button discardButton = new Button("Discard");
                     discardButton.setStyle("-fx-padding: 2 5 2 5; -fx-font-size: 10px; -fx-text-fill: #f44336;");
                     discardButton.setOnAction(e -> {
-                        Path absolutePath = gitManager.getRootPath().resolve(item.path);
-                        gitManager.discardChanges(item.path);
+                        Path absolutePath = gitManager.getRootPath().resolve(fileChange.path);
+                        gitManager.discardChanges(fileChange.path);
                         refreshStatus();
                         if (onFileDiscarded != null) onFileDiscarded.accept(absolutePath);
                         if (onRefresh != null) onRefresh.accept(null);
@@ -305,17 +306,80 @@ public class SourceControlPanel extends ScrollPane {
                 }
                 buttons.getChildren().add(actionButton);
 
-                box.getChildren().addAll(statusLabel, details, spacer, buttons);
+                box.getChildren().addAll(statusLabel, fileLabel, spacer, buttons);
                 setGraphic(box);
+                setText(null);
 
                 // Double-click opens diff view for this file
                 setOnMouseClicked(e -> {
                     if (e.getClickCount() == 2 && onOpenDiff != null) {
-                        onOpenDiff.accept(item.path);
+                        onOpenDiff.accept(fileChange.path);
                     }
                 });
             }
         };
+    }
+
+    private TreeItem<ChangeTreeNode> buildTree(Map<Path, String> changes, boolean staged) {
+        TreeItem<ChangeTreeNode> root = new TreeItem<>(new ChangeTreeNode("", true, null));
+        root.setExpanded(true);
+
+        changes.entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .forEach(entry -> addFileToTree(root, new FileChange(entry.getKey(), entry.getValue(), staged)));
+
+        sortTree(root);
+        return root;
+    }
+
+    private void addFileToTree(TreeItem<ChangeTreeNode> root, FileChange change) {
+        TreeItem<ChangeTreeNode> current = root;
+        Path path = change.path;
+
+        for (int i = 0; i < path.getNameCount(); i++) {
+            String segment = path.getName(i).toString();
+            boolean isLeaf = i == path.getNameCount() - 1;
+
+            if (isLeaf) {
+                TreeItem<ChangeTreeNode> fileNode = new TreeItem<>(new ChangeTreeNode(segment, false, change));
+                current.getChildren().add(fileNode);
+                return;
+            }
+
+            TreeItem<ChangeTreeNode> folder = findFolderChild(current, segment);
+            if (folder == null) {
+                folder = new TreeItem<>(new ChangeTreeNode(segment, true, null));
+                folder.setExpanded(true);
+                current.getChildren().add(folder);
+            }
+            current = folder;
+        }
+    }
+
+    private TreeItem<ChangeTreeNode> findFolderChild(TreeItem<ChangeTreeNode> parent, String name) {
+        for (TreeItem<ChangeTreeNode> child : parent.getChildren()) {
+            ChangeTreeNode node = child.getValue();
+            if (node.folder && node.name.equals(name)) {
+                return child;
+            }
+        }
+        return null;
+    }
+
+    private void sortTree(TreeItem<ChangeTreeNode> item) {
+        item.getChildren().sort((left, right) -> {
+            ChangeTreeNode a = left.getValue();
+            ChangeTreeNode b = right.getValue();
+
+            if (a.folder != b.folder) {
+                return a.folder ? -1 : 1;
+            }
+            return a.name.compareToIgnoreCase(b.name);
+        });
+
+        for (TreeItem<ChangeTreeNode> child : item.getChildren()) {
+            sortTree(child);
+        }
     }
 
     /**
@@ -340,7 +404,7 @@ public class SourceControlPanel extends ScrollPane {
             return;
         }
 
-        if (stagedView.getItems().isEmpty()) {
+        if (stagedTree.getRoot() == null || stagedTree.getRoot().getChildren().isEmpty()) {
             new Alert(AlertType.WARNING, "No staged changes to commit").showAndWait();
             return;
         }
