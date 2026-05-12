@@ -12,12 +12,20 @@ import java.util.Set;
 
 import javafx.application.Platform;
 import javafx.concurrent.Task;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.control.SplitPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.stage.Popup;
 
 import org.eclipse.lsp4j.CompletionItem;
@@ -51,6 +59,11 @@ class EditorTab extends Tab {
     CompletionPopup completionPopup;
     String virtualUri;
     List<CompletionItem> allCompletionItems;
+    private final ToggleButton editorModeEditorButton;
+    private final ToggleButton editorModeSplitButton;
+    private final ToggleButton editorModePreviewButton;
+    private final StackPane contentHolder;
+    private final StackPane mainContentHolder;
     
     private String originalChecksum;
     long fileLastModifiedTime;
@@ -77,7 +90,37 @@ class EditorTab extends Tab {
         codeArea = new CodeArea();
         codeArea.setParagraphGraphicFactory(LineNumberFactory.get(codeArea));
         editorPane = new VirtualizedScrollPane<>(codeArea);
-        setContent(editorPane);
+
+        ToggleGroup editorModeToggleGroup = new ToggleGroup();
+        editorModeEditorButton = new ToggleButton("Editor");
+        editorModeEditorButton.setToggleGroup(editorModeToggleGroup);
+        editorModeEditorButton.setOnAction(e -> applyViewMode(ViewMode.EDITOR));
+
+        editorModeSplitButton = new ToggleButton("Split");
+        editorModeSplitButton.setToggleGroup(editorModeToggleGroup);
+        editorModeSplitButton.setOnAction(e -> applyViewMode(ViewMode.SPLIT));
+
+        editorModePreviewButton = new ToggleButton("Preview");
+        editorModePreviewButton.setToggleGroup(editorModeToggleGroup);
+        editorModePreviewButton.setOnAction(e -> applyViewMode(ViewMode.PREVIEW));
+
+        String editorModeTooltip = "Editor | Split | Preview";
+        editorModeEditorButton.setTooltip(new Tooltip(editorModeTooltip));
+        editorModeSplitButton.setTooltip(new Tooltip(editorModeTooltip));
+        editorModePreviewButton.setTooltip(new Tooltip(editorModeTooltip));
+
+        HBox editorModeGroup = new HBox(4, editorModeEditorButton, editorModeSplitButton, editorModePreviewButton);
+        editorModeGroup.setStyle("-fx-background-color: rgba(245,245,245,0.9); -fx-background-radius: 4; -fx-padding: 2 4 2 4;");
+        editorModeGroup.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+
+        mainContentHolder = new StackPane();
+        contentHolder = new StackPane();
+        contentHolder.getChildren().addAll(mainContentHolder, editorModeGroup);
+        StackPane.setAlignment(editorModeGroup, Pos.TOP_RIGHT);
+        StackPane.setMargin(editorModeGroup, new Insets(6, 8, 0, 0));
+
+        setContent(contentHolder);
+        applyViewMode(ViewMode.EDITOR);
 
         cleanup = codeArea.multiPlainChanges()
                 .successionEnds(Duration.ofMillis(500))
@@ -456,24 +499,36 @@ class EditorTab extends Tab {
     }
 
     void applyViewMode(ViewMode mode) {
-        this.currentViewMode = mode;
-        switch (mode) {
-            case EDITOR -> setContent(editorPane);
+        boolean hasPreview = ctx.previewRegistry().hasPreview(extension);
+        editorModeSplitButton.setDisable(!hasPreview);
+        editorModePreviewButton.setDisable(!hasPreview);
+
+        ViewMode effectiveMode = (!hasPreview && mode != ViewMode.EDITOR) ? ViewMode.EDITOR : mode;
+        this.currentViewMode = effectiveMode;
+        switch (effectiveMode) {
+            case EDITOR -> mainContentHolder.getChildren().setAll(editorPane);
             case SPLIT -> {
                 if (cachedPreviewNode == null) buildPreviewNode();
                 if (cachedPreviewNode != null) {
                     SplitPane sp = new SplitPane(editorPane, cachedPreviewNode);
                     sp.setDividerPositions(0.5);
-                    setContent(sp);
+                    mainContentHolder.getChildren().setAll(sp);
                 } else {
-                    setContent(editorPane);
+                    mainContentHolder.getChildren().setAll(editorPane);
                 }
             }
             case PREVIEW -> {
                 if (cachedPreviewNode == null) buildPreviewNode();
-                setContent(cachedPreviewNode != null ? cachedPreviewNode : editorPane);
+                mainContentHolder.getChildren().setAll(cachedPreviewNode != null ? cachedPreviewNode : editorPane);
             }
         }
+
+        switch (effectiveMode) {
+            case EDITOR -> editorModeEditorButton.setSelected(true);
+            case SPLIT -> editorModeSplitButton.setSelected(true);
+            case PREVIEW -> editorModePreviewButton.setSelected(true);
+        }
+
         ctx.onViewModeChanged().accept(this);
     }
 
