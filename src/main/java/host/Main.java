@@ -16,6 +16,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.Label;
 import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SplitPane;
@@ -25,7 +26,9 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
@@ -64,6 +67,7 @@ public class Main extends Application {
     private GitManager gitManager;
     private ComboBox<String> runConfigurationDropdown;
     private BottomPanel bottomPanel;
+    private Label activePathLabel;
 
     @Override
     public void start(Stage primaryStage) {
@@ -106,6 +110,9 @@ public class Main extends Application {
 
         MenuBar menuBar = buildMenuBar();
         ToolBar runToolbar = buildRunToolbar();
+        HBox editorModeBar = buildEditorModeBar();
+        VBox centerContainer = new VBox(editorModeBar, centerPanel);
+        VBox.setVgrow(centerPanel, Priority.ALWAYS);
 
         leftPanel = new LeftPanel(rootPath, fileTypes,
                 navigator,
@@ -118,7 +125,7 @@ public class Main extends Application {
 
         rightPanel = new RightPanel(pos -> mainSplitPane.getDividers().get(1).setPosition(pos));
 
-        mainSplitPane = new SplitPane(leftPanel, centerPanel, rightPanel);
+        mainSplitPane = new SplitPane(leftPanel, centerContainer, rightPanel);
         SplitPane.setResizableWithParent(leftPanel, Boolean.FALSE);
         SplitPane.setResizableWithParent(rightPanel, Boolean.FALSE);
         mainSplitPane.setDividerPositions(0.25, 1.0 - 0.025);
@@ -225,6 +232,18 @@ public class Main extends Application {
         return toolBar;
     }
 
+    private HBox buildEditorModeBar() {
+        activePathLabel = new Label("");
+        activePathLabel.setStyle("-fx-text-fill: #666; -fx-font-size: 11px;");
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        HBox bar = new HBox(activePathLabel, spacer);
+        bar.setStyle("-fx-padding: 4 8 4 8;");
+        return bar;
+    }
+
     private void refreshRunConfigurationDropdown() {
         if (runConfigurationDropdown == null) {
             return;
@@ -261,6 +280,7 @@ public class Main extends Application {
     private void onEditorActivated(ActiveEditorInfo info) {
         updateStylesheet(info.extension());
         updateViewMenu(info.hasPreview(), info.viewMode());
+        updateActivePathLabel(centerPanel.getActiveFilePath().orElse(null));
     }
 
     private void onDiffActivated() {
@@ -275,12 +295,35 @@ public class Main extends Application {
             String name = det.filePath.getFileName().toString();
             int dot = name.lastIndexOf('.');
             if (dot > 0) extension = name.substring(dot + 1);
+            updateActivePathLabel(det.filePath);
+        } else {
+            updateActivePathLabel(null);
         }
 
         String sheet = Languages.forExtension(extension).stylesheetResource();
         addStylesheet(scene, sheet);
         addStylesheet(scene, "/host/keywords/lsp.css");
         addStylesheet(scene, "/host/keywords/diff.css");
+    }
+
+    private void updateActivePathLabel(Path absolutePath) {
+        if (activePathLabel == null) {
+            return;
+        }
+
+        if (absolutePath == null) {
+            activePathLabel.setText("");
+            return;
+        }
+
+        Path normalized = absolutePath.toAbsolutePath().normalize();
+        Path relativePath;
+        try {
+            relativePath = rootPath.relativize(normalized);
+        } catch (IllegalArgumentException e) {
+            relativePath = normalized;
+        }
+        activePathLabel.setText(relativePath.toString());
     }
 
     private void refreshStatus() {
@@ -319,6 +362,7 @@ public class Main extends Application {
         if (viewEditorItem == null) return;
         viewSplitItem.setDisable(!hasPreview);
         viewPreviewItem.setDisable(!hasPreview);
+
         switch (viewMode) {
             case EDITOR -> viewEditorItem.setSelected(true);
             case SPLIT -> viewSplitItem.setSelected(true);
