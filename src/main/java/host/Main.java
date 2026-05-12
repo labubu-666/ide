@@ -2,6 +2,7 @@ package host;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -10,12 +11,15 @@ import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.SplitPane;
+import javafx.scene.control.ToolBar;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
@@ -58,6 +62,8 @@ public class Main extends Application {
     private LeftPanel leftPanel;
     private RightPanel rightPanel;
     private GitManager gitManager;
+    private ComboBox<String> runConfigurationDropdown;
+    private BottomPanel bottomPanel;
 
     @Override
     public void start(Stage primaryStage) {
@@ -79,6 +85,7 @@ public class Main extends Application {
         }
 
         Settings.load(rootPath);
+        showRunConfigurationCollisionAlertIfNeeded();
         // TODO: Temporarily synchronous due to lack of backgroiund jobs feature - will be made async later
         SearchService.initializeIndex(rootPath);
         gitManager = new GitManager(rootPath);
@@ -98,6 +105,7 @@ public class Main extends Application {
         EditorNavigator navigator = centerPanel;
 
         MenuBar menuBar = buildMenuBar();
+        ToolBar runToolbar = buildRunToolbar();
 
         leftPanel = new LeftPanel(rootPath, fileTypes,
                 navigator,
@@ -117,8 +125,9 @@ public class Main extends Application {
         mainSplitPane.setStyle("-fx-padding: 0;");
 
         statusBar = new StatusBar(gitManager, fileTypes);
+        bottomPanel = new BottomPanel();
 
-        VBox root = new VBox(menuBar, mainSplitPane, statusBar);
+        VBox root = new VBox(menuBar, runToolbar, mainSplitPane, bottomPanel, statusBar);
         VBox.setVgrow(mainSplitPane, Priority.ALWAYS);
         root.setPrefSize(1024, 768);
 
@@ -180,12 +189,71 @@ public class Main extends Application {
 
         MenuItem settingsItem = new MenuItem("Preferences...");
         settingsItem.setAccelerator(KeyCombination.keyCombination("Shortcut+,"));
-        settingsItem.setOnAction(e -> new SettingsDialog(primaryStage).show());
+        settingsItem.setOnAction(e -> {
+            SettingsDialog settingsDialog = new SettingsDialog(primaryStage, rootPath);
+            settingsDialog.show();
+            settingsDialog.getStage().setOnHiding(event -> {
+                refreshRunConfigurationDropdown();
+                showRunConfigurationCollisionAlertIfNeeded();
+            });
+        });
 
         Menu settingsMenu = new Menu("Settings");
         settingsMenu.getItems().add(settingsItem);
 
         return new MenuBar(fileMenu, viewMenu, settingsMenu);
+    }
+
+    private ToolBar buildRunToolbar() {
+        runConfigurationDropdown = new ComboBox<>();
+        runConfigurationDropdown.setPromptText("Run configuration");
+        runConfigurationDropdown.setPrefWidth(320);
+
+        Button runButton = new Button("Run");
+        runButton.setOnAction(e -> {
+            String selected = runConfigurationDropdown.getSelectionModel().getSelectedItem();
+            if (selected == null || selected.isBlank()) {
+                bottomPanel.appendOutput("[run] No run configuration selected.");
+                return;
+            }
+            bottomPanel.appendOutput("[run] Selected configuration: " + selected);
+            bottomPanel.appendOutput("[run] Execution wiring is not implemented yet.");
+        });
+
+        ToolBar toolBar = new ToolBar(runConfigurationDropdown, runButton);
+        refreshRunConfigurationDropdown();
+        return toolBar;
+    }
+
+    private void refreshRunConfigurationDropdown() {
+        if (runConfigurationDropdown == null) {
+            return;
+        }
+
+        String previousSelection = runConfigurationDropdown.getSelectionModel().getSelectedItem();
+        runConfigurationDropdown.getItems().setAll(Settings.getRunConfigurations().keySet());
+
+        if (previousSelection != null && runConfigurationDropdown.getItems().contains(previousSelection)) {
+            runConfigurationDropdown.getSelectionModel().select(previousSelection);
+            return;
+        }
+
+        if (!runConfigurationDropdown.getItems().isEmpty()) {
+            runConfigurationDropdown.getSelectionModel().selectFirst();
+        }
+    }
+
+    private void showRunConfigurationCollisionAlertIfNeeded() {
+        Set<String> collisions = Settings.getRunConfigurationCollisionKeys();
+        if (collisions.isEmpty()) {
+            return;
+        }
+
+        Alert alert = new Alert(AlertType.WARNING);
+        alert.setTitle("Run Configuration Collision");
+        alert.setHeaderText("Project run configurations override global ones");
+        alert.setContentText("Colliding keys: " + String.join(", ", collisions));
+        alert.showAndWait();
     }
 
     // --- CenterPanel callbacks ---
