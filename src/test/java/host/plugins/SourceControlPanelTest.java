@@ -28,6 +28,8 @@ import host.plugins.versioncontrol.git.SourceControlPanel.Header;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.TreeItem;
+import javafx.scene.control.TreeView;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 
@@ -491,5 +493,127 @@ class SourceControlPanelTest {
         } finally {
             deleteDirectoryRecursively(repo);
         }
+    }
+
+    @Test
+    void should_render_unstaged_changes_as_hierarchical_tree() throws Exception {
+        Path repo = createTempGitRepository();
+        try {
+            GitManager localGitManager = new GitManager(repo);
+            SourceControlPanel localPanel = new SourceControlPanel(localGitManager, v -> {}, null, null);
+
+            Path nestedFile = repo.resolve("hierarchy-parent").resolve("hierarchy-child").resolve("deep-file.txt");
+            Files.createDirectories(nestedFile.getParent());
+            Files.writeString(nestedFile, "tree test content");
+
+            localPanel.refreshStatus();
+
+            TreeView<?> changesTree = getPrivateField(localPanel, "changesTree", TreeView.class);
+            TreeItem<?> root = changesTree.getRoot();
+
+            TreeItem<?> parentFolder = findChildByName(root, "hierarchy-parent");
+            assertThat(parentFolder)
+                .as("Top-level folder should be present in changes tree")
+                .isNotNull();
+            assertThat(nodeIsFolder(parentFolder))
+                .as("Top-level hierarchy node should be a folder")
+                .isTrue();
+
+            TreeItem<?> childFolder = findChildByName(parentFolder, "hierarchy-child");
+            assertThat(childFolder)
+                .as("Nested folder should be present under top-level folder")
+                .isNotNull();
+            assertThat(nodeIsFolder(childFolder))
+                .as("Nested hierarchy node should be a folder")
+                .isTrue();
+
+            TreeItem<?> fileLeaf = findChildByName(childFolder, "deep-file.txt");
+            assertThat(fileLeaf)
+                .as("File leaf should be present under nested folder")
+                .isNotNull();
+            assertThat(nodeIsFolder(fileLeaf))
+                .as("File node should not be marked as folder")
+                .isFalse();
+
+            localGitManager.close();
+        } finally {
+            deleteDirectoryRecursively(repo);
+        }
+    }
+
+    @Test
+    void should_keep_folder_nodes_structural_only_in_changes_tree() throws Exception {
+        Path repo = createTempGitRepository();
+        try {
+            GitManager localGitManager = new GitManager(repo);
+            SourceControlPanel localPanel = new SourceControlPanel(localGitManager, v -> {}, null, null);
+
+            Path nestedFile = repo.resolve("tree-actions-parent").resolve("tree-actions-child").resolve("leaf.txt");
+            Files.createDirectories(nestedFile.getParent());
+            Files.writeString(nestedFile, "folder action test");
+
+            localPanel.refreshStatus();
+
+            TreeView<?> changesTree = getPrivateField(localPanel, "changesTree", TreeView.class);
+            TreeItem<?> root = changesTree.getRoot();
+
+            TreeItem<?> parentFolder = findChildByName(root, "tree-actions-parent");
+            TreeItem<?> childFolder = findChildByName(parentFolder, "tree-actions-child");
+            TreeItem<?> fileLeaf = findChildByName(childFolder, "leaf.txt");
+
+            assertThat(nodeChange(parentFolder))
+                .as("Folder nodes should not carry file change payload")
+                .isNull();
+            assertThat(nodeChange(childFolder))
+                .as("Nested folder nodes should not carry file change payload")
+                .isNull();
+            assertThat(nodeChange(fileLeaf))
+                .as("File leaf should carry file change payload")
+                .isNotNull();
+
+            localGitManager.close();
+        } finally {
+            deleteDirectoryRecursively(repo);
+        }
+    }
+
+    private static TreeItem<?> findChildByName(TreeItem<?> parent, String expectedName) throws Exception {
+        if (parent == null) {
+            return null;
+        }
+
+        for (TreeItem<?> child : parent.getChildren()) {
+            if (expectedName.equals(nodeName(child))) {
+                return child;
+            }
+        }
+        return null;
+    }
+
+    private static String nodeName(TreeItem<?> treeItem) throws Exception {
+        Object node = treeItem.getValue();
+        return (String) invokeNodeMethod(node, "name");
+    }
+
+    private static boolean nodeIsFolder(TreeItem<?> treeItem) throws Exception {
+        Object node = treeItem.getValue();
+        return (boolean) invokeNodeMethod(node, "folder");
+    }
+
+    private static Object nodeChange(TreeItem<?> treeItem) throws Exception {
+        Object node = treeItem.getValue();
+        return invokeNodeMethod(node, "change");
+    }
+
+    private static Object invokeNodeMethod(Object node, String methodName) throws Exception {
+        var method = node.getClass().getDeclaredMethod(methodName);
+        method.setAccessible(true);
+        return method.invoke(node);
+    }
+
+    private static <T> T getPrivateField(Object target, String fieldName, Class<T> fieldType) throws Exception {
+        var field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return fieldType.cast(field.get(target));
     }
 }
