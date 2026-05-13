@@ -10,8 +10,12 @@ import java.util.function.BiConsumer;
 
 import language.Languages;
 import org.eclipse.lsp4j.Diagnostic;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class LspServerRegistry {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(LspServerRegistry.class);
 
     private final Map<String, CompletableFuture<LspServerConnection>> futures = new ConcurrentHashMap<>();
     private final Path workspaceRoot;
@@ -35,7 +39,7 @@ public class LspServerRegistry {
             try {
                 return LspServerConnection.start(command, workspaceRoot, onDiagnostics);
             } catch (IOException e) {
-                System.err.println("[LSP] Failed to start server for " + ext + ": " + e.getMessage());
+                LOGGER.warn("[LSP] Failed to start server for {}: {}", ext, e.getMessage());
                 return CompletableFuture.completedFuture(null);
             }
         });
@@ -46,11 +50,11 @@ public class LspServerRegistry {
     }
 
     public CompletableFuture<Void> shutdownAll() {
-        System.err.println("[LSP Registry] Beginning graceful shutdown of all LSP servers...");
+        LOGGER.info("[LSP Registry] Beginning graceful shutdown of all LSP servers...");
         List<CompletableFuture<Void>> shutdownFutures = futures.values().stream()
             .map(f -> f.thenAccept(conn -> {
                 if (conn != null) {
-                    System.err.println("[LSP Registry] Shutting down LSP server...");
+                    LOGGER.info("[LSP Registry] Shutting down LSP server...");
                     conn.shutdown();
                 }
             }))
@@ -62,7 +66,7 @@ public class LspServerRegistry {
         
         futures.clear();
         return allShutdown.thenRun(() -> 
-            System.err.println("[LSP Registry] All LSP servers shut down")
+            LOGGER.info("[LSP Registry] All LSP servers shut down")
         );
     }
 }

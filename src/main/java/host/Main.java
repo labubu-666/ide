@@ -31,6 +31,8 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import managers.GitManager;
 import settings.Settings;
@@ -42,9 +44,12 @@ import lsp.LspServerRegistry;
 import preview.PreviewRegistry;
 import search.SearchService;
 import settings.SettingsDialog;
+import utils.BenchmarkUtils;
 import utils.FileUtils;
 
 public class Main extends Application {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
 
     public static void main(String[] args) {
         launch(args);
@@ -91,7 +96,7 @@ public class Main extends Application {
         Settings.load(rootPath);
         showRunConfigurationCollisionAlertIfNeeded();
         // TODO: Temporarily synchronous due to lack of backgroiund jobs feature - will be made async later
-        SearchService.initializeIndex(rootPath);
+        BenchmarkUtils.benchmark("SearchService.initializeIndex", () -> SearchService.initializeIndex(rootPath));
         gitManager = new GitManager(rootPath);
         lspRegistry = new LspServerRegistry(rootPath, (uri, diagnostics) ->
             Platform.runLater(() -> centerPanel.applyDiagnostics(uri, diagnostics)));
@@ -145,7 +150,7 @@ public class Main extends Application {
                 event.consume();
             } else if (new KeyCodeCombination(KeyCode.F,
                     KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN).match(event)) {
-                new GlobalSearchDialog(primaryStage, rootPath, navigator::openSearchMatch).show();
+                leftPanel.showSearchPanel();
                 event.consume();
             }
         });
@@ -372,40 +377,40 @@ public class Main extends Application {
 
     @Override
     public void stop() {
-        System.err.println("[Main] Application stop() called, initiating graceful shutdown...");
+        LOGGER.info("[Main] Application stop() called, initiating graceful shutdown...");
 
         centerPanel.disposeAll();
 
         try {
-            System.err.println("[Main] Waiting for LSP servers to shutdown...");
+            LOGGER.info("[Main] Waiting for LSP servers to shutdown...");
             lspRegistry.shutdownAll().get(10, java.util.concurrent.TimeUnit.SECONDS);
-            System.err.println("[Main] LSP servers shutdown complete");
+            LOGGER.info("[Main] LSP servers shutdown complete");
         } catch (java.util.concurrent.TimeoutException e) {
-            System.err.println("[Main] LSP server shutdown timed out after 10 seconds");
+            LOGGER.warn("[Main] LSP server shutdown timed out after 10 seconds");
         } catch (Exception e) {
-            System.err.println("[Main] Error during LSP shutdown: " + e.getMessage());
+            LOGGER.warn("[Main] Error during LSP shutdown: {}", e.getMessage());
         }
 
-        System.err.println("[Main] Closing git manager and file watcher...");
+        LOGGER.info("[Main] Closing git manager and file watcher...");
         if (gitManager != null) {
             gitManager.close();
         }
 
-        System.err.println("[Main] Shutting down executor service...");
+        LOGGER.info("[Main] Shutting down executor service...");
         executor.shutdown();
         try {
             if (!executor.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
-                System.err.println("[Main] Executor did not terminate within 5 seconds, forcing shutdown...");
+                LOGGER.warn("[Main] Executor did not terminate within 5 seconds, forcing shutdown...");
                 executor.shutdownNow();
                 executor.awaitTermination(1, java.util.concurrent.TimeUnit.SECONDS);
             }
-            System.err.println("[Main] Executor shutdown complete");
+            LOGGER.info("[Main] Executor shutdown complete");
         } catch (InterruptedException e) {
-            System.err.println("[Main] Interrupted while waiting for executor shutdown");
+            LOGGER.warn("[Main] Interrupted while waiting for executor shutdown");
             executor.shutdownNow();
         }
 
-        System.err.println("[Main] Graceful shutdown complete, exiting JVM...");
+        LOGGER.info("[Main] Graceful shutdown complete, exiting JVM...");
         System.exit(0);
     }
 }

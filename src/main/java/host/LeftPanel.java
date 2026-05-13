@@ -10,14 +10,20 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import host.plugins.versioncontrol.git.SourceControlPanel;
+import javafx.animation.PauseTransition;
+import javafx.application.Platform;
+import javafx.geometry.Insets;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.Tooltip;
 import javafx.scene.control.TreeCell;
@@ -25,13 +31,19 @@ import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
+import javafx.util.Duration;
 
 import managers.GitManager;
 import filetype.FileTypeRegistry;
+import search.SearchMatch;
+import search.SearchService;
 
 class LeftPanel extends HBox {
 
@@ -42,6 +54,7 @@ class LeftPanel extends HBox {
 
     private static final double EXPANDED_DIVIDER = 0.25;
     private static final double COLLAPSED_DIVIDER = 0.025;
+    private static final Duration SEARCH_DEBOUNCE = Duration.millis(180);
 
     private final FileTypeRegistry fileTypes;
     private final EditorNavigator navigator;
@@ -56,12 +69,20 @@ class LeftPanel extends HBox {
     private final TreeItem<TreeNode> rootItem;
     private final Path rootPath;
     private final StackPane contentArea;
+    private final VBox searchContent;
+    private final TextField searchQueryField;
+    private final ListView<SearchMatch> searchResultList;
+    private final TextFlow searchStatusFlow;
+    private final GlobalSearchController searchController;
+    private final PauseTransition searchDebounce;
 
     private final Button fileBrowserButton;
     private final Button sourceControlButton;
     private final Button storeButton;
+    private final Button searchButton;
 
     private SourceControlPanel sourceControlPanel;
+    private Thread searchThread;
     private boolean expanded = true;
     private String selectedTab = "file-browser";
 
@@ -82,6 +103,49 @@ class LeftPanel extends HBox {
         this.onDividerChange = onDividerChange;
         this.onOpenDiff = onOpenDiff;
         this.gitManager = gitManager != null ? gitManager : new GitManager(rootPath);
+        this.searchController = new GlobalSearchController(new SearchService(rootPath));
+
+        searchQueryField = new TextField();
+        searchQueryField.setPromptText("Search in files...");
+
+        searchResultList = new ListView<>();
+        searchResultList.setCellFactory(lv -> new SearchMatchCell(rootPath));
+
+        searchStatusFlow = new TextFlow();
+
+        searchDebounce = new PauseTransition(SEARCH_DEBOUNCE);
+        searchDebounce.setOnFinished(e -> performSearch(searchQueryField.getText()));
+
+        searchContent = new VBox(8, searchQueryField, searchResultList, searchStatusFlow);
+        searchContent.setPadding(new Insets(12));
+        VBox.setVgrow(searchResultList, Priority.ALWAYS);
+
+        searchQueryField.textProperty().addListener((obs, oldV, newV) -> scheduleSearch(newV));
+        searchQueryField.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.DOWN) {
+                if (!searchResultList.getItems().isEmpty()) {
+                    searchResultList.getSelectionModel().selectFirst();
+                    searchResultList.requestFocus();
+                }
+                e.consume();
+            } else if (e.getCode() == KeyCode.ENTER) {
+                if (searchResultList.getSelectionModel().getSelectedItem() == null
+                        && !searchResultList.getItems().isEmpty()) {
+                    searchResultList.getSelectionModel().selectFirst();
+                }
+                openSelectedSearchResult();
+            }
+        });
+
+        searchResultList.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ENTER) {
+                openSelectedSearchResult();
+            }
+        });
+
+        searchResultList.setOnMouseClicked(e -> {
+            if (e.getClickCount() == 2) openSelectedSearchResult();
+        });
 
         VBox sidebar = new VBox();
         sidebar.setPrefWidth(24);
@@ -92,13 +156,15 @@ class LeftPanel extends HBox {
         fileBrowserButton = createTabButton("File Browser", "/host/icons/document.png");
         sourceControlButton = createTabButton("Source Control", "/host/icons/arrow-split-090.png");
         storeButton = createTabButton("Store", "/host/icons/store.png");
+        searchButton = createTabButton("Search", "/host/icons/magnifier.png");
 
         fileBrowserButton.setOnAction(e -> selectTab("file-browser"));
         sourceControlButton.setOnAction(e -> selectTab("source-control"));
         storeButton.setOnAction(e -> selectTab("store"));
+        searchButton.setOnAction(e -> selectTab("search"));
         fileBrowserButton.setStyle("-fx-padding: 0; -fx-focus-color: transparent; -fx-faint-focus-color: transparent;");
 
-        sidebar.getChildren().addAll(fileBrowserButton, sourceControlButton, storeButton);
+        sidebar.getChildren().addAll(fileBrowserButton, sourceControlButton, storeButton, searchButton);
 
         String label = rootPath.getFileName() != null ? rootPath.getFileName().toString() : rootPath.toString();
         rootItem = new TreeItem<>(new TreeNode(label, rootPath));
@@ -217,6 +283,15 @@ class LeftPanel extends HBox {
         }
     }
 
+    void showSearchPanel() {
+        if (expanded && "search".equals(selectedTab)) {
+            Platform.runLater(searchQueryField::requestFocus);
+            return;
+        }
+        selectTab("search");
+        Platform.runLater(searchQueryField::requestFocus);
+    }
+
     private void selectTab(String tabId) {
         boolean wasExpanded = expanded;
         if (selectedTab.equals(tabId)) {
@@ -234,6 +309,7 @@ class LeftPanel extends HBox {
         fileBrowserButton.setStyle(baseStyle);
         sourceControlButton.setStyle(baseStyle);
         storeButton.setStyle(baseStyle);
+        searchButton.setStyle(baseStyle);
 
         contentArea.setVisible(expanded);
         contentArea.setManaged(expanded);
@@ -267,6 +343,72 @@ class LeftPanel extends HBox {
                 lbl.setStyle("-fx-text-fill: #999; -fx-font-size: 14px;");
                 contentArea.getChildren().add(lbl);
             }
+            case "search" -> contentArea.getChildren().add(searchContent);
+        }
+
+        if (!"search".equals(tabId)) {
+            searchDebounce.stop();
+            interruptSearchThread();
+        }
+    }
+
+    private void scheduleSearch(String query) {
+        searchDebounce.stop();
+        interruptSearchThread();
+        if (!searchController.prepareQuery(query)) {
+            searchResultList.getItems().clear();
+            searchStatusFlow.getChildren().clear();
+            return;
+        }
+        setSearchingStatus(query);
+        searchDebounce.playFromStart();
+    }
+
+    private void performSearch(String query) {
+        if (query == null || query.isEmpty()) return;
+        GlobalSearchController.SearchRun run = searchController.beginSearch(query);
+        Thread t = new Thread(() -> runSearch(run), "global-search-panel");
+        t.setDaemon(true);
+        searchThread = t;
+        t.start();
+    }
+
+    private void runSearch(GlobalSearchController.SearchRun run) {
+        GlobalSearchController.SearchResult result = searchController.executeSearch(run);
+        if (result.ignored()) return;
+
+        Platform.runLater(() -> {
+            if (!searchController.shouldApply(run, searchQueryField.getText())) return;
+            if (result.hasError()) {
+                setSearchStatusText(result.errorText());
+                return;
+            }
+            searchResultList.getItems().setAll(result.results());
+            setSearchStatusText(result.statusText());
+        });
+    }
+
+    private void interruptSearchThread() {
+        if (searchThread != null && searchThread.isAlive()) {
+            searchThread.interrupt();
+        }
+    }
+
+    private void setSearchingStatus(String query) {
+        Text prefix = new Text("Searching for ");
+        Text term = new Text(query);
+        term.setStyle("-fx-font-weight: bold;");
+        searchStatusFlow.getChildren().setAll(prefix, term);
+    }
+
+    private void setSearchStatusText(String status) {
+        searchStatusFlow.getChildren().setAll(new Text(status));
+    }
+
+    private void openSelectedSearchResult() {
+        SearchMatch selected = searchResultList.getSelectionModel().getSelectedItem();
+        if (selected != null) {
+            navigator.openSearchMatch(selected);
         }
     }
 
@@ -386,5 +528,58 @@ class LeftPanel extends HBox {
 
         Tooltip.install(btn, new Tooltip(tooltipText));
         return btn;
+    }
+
+    private static class SearchMatchCell extends ListCell<SearchMatch> {
+        private static final int MATCH_CONTEXT_CHARS = 40;
+
+        private final Path rootPath;
+
+        SearchMatchCell(Path rootPath) {
+            this.rootPath = rootPath;
+        }
+
+        @Override
+        protected void updateItem(SearchMatch match, boolean empty) {
+            super.updateItem(match, empty);
+            if (empty || match == null) {
+                setText(null);
+                setGraphic(null);
+                return;
+            }
+
+            String line = match.lineText();
+            int snippetStart = Math.max(0, match.columnStart() - MATCH_CONTEXT_CHARS);
+            int snippetEnd = Math.min(line.length(), match.columnEnd() + MATCH_CONTEXT_CHARS);
+
+            String preText = line.substring(snippetStart, match.columnStart());
+            String matchText = line.substring(match.columnStart(), match.columnEnd());
+            String postText = line.substring(match.columnEnd(), snippetEnd);
+
+            if (snippetStart > 0) {
+                preText = "..." + preText;
+            }
+            if (snippetEnd < line.length()) {
+                postText = postText + "...";
+            }
+
+            Text pre = new Text(preText);
+            Text found = new Text(matchText);
+            found.setStyle("-fx-font-weight: bold; -fx-fill: #e07b00;");
+            Text post = new Text(postText);
+
+            Path relativePath;
+            try {
+                relativePath = rootPath.relativize(match.filePath());
+            } catch (IllegalArgumentException e) {
+                relativePath = match.filePath();
+            }
+
+            Text location = new Text(relativePath + ":" + match.lineNumber());
+            location.setStyle("-fx-fill: #888888;");
+
+            setText(null);
+            setGraphic(new VBox(2, new TextFlow(pre, found, post), new TextFlow(location)));
+        }
     }
 }

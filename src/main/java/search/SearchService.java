@@ -30,11 +30,16 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Plain-text substring search across all readable files under a root directory.
  * Skips known build/VCS folders and files larger than {@link #MAX_FILE_SIZE_BYTES}.
  */
 public class SearchService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(SearchService.class);
 
     private static final Set<String> IGNORED_DIRECTORIES = Set.of(
             ".atlassian-cache", ".git", ".idea", ".gradle", ".pytest_cache", ".venv", ".vscode", ".settings",
@@ -73,7 +78,7 @@ public class SearchService {
                 SearchIndexData loaded = loadIndex(normalizedRoot, indexPath);
                 INDEX_CACHE.put(normalizedRoot, loaded);
                 long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
-                System.err.println("[SearchService] Index loaded in " + elapsedMs + "ms (files=" + snapshot.fileCount() + ", lines=" + loaded.lines().size() + ")");
+                LOGGER.info("[SearchService] Index loaded in {}ms (files={}, lines={})", elapsedMs, snapshot.fileCount(), loaded.lines().size());
                 return;
             }
 
@@ -83,11 +88,11 @@ public class SearchService {
             writeMetadata(metadataPath, snapshot.signatureHash(), snapshot.fileCount());
             INDEX_CACHE.put(normalizedRoot, rebuilt);
             long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
-            System.err.println("[SearchService] Index rebuilt in " + elapsedMs + "ms (files=" + snapshot.fileCount() + ", lines=" + rebuilt.lines().size() + ")");
+            LOGGER.info("[SearchService] Index rebuilt in {}ms (files={}, lines={})", elapsedMs, snapshot.fileCount(), rebuilt.lines().size());
         } catch (Exception ex) {
             INDEX_CACHE.remove(normalizedRoot);
             long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
-            System.err.println("[SearchService] Index initialization failed after " + elapsedMs + "ms, falling back to scan search: " + ex.getMessage());
+            LOGGER.warn("[SearchService] Index initialization failed after {}ms, falling back to scan search: {}", elapsedMs, ex.getMessage());
         }
     }
 
@@ -108,19 +113,17 @@ public class SearchService {
             try {
                 List<SearchMatch> results = searchIndexed(query, maxResults, index);
                 long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
-                System.err.println("[SearchService] search path=indexed query='" + summarizeQuery(query)
-                        + "' results=" + results.size() + " elapsedMs=" + elapsedMs);
+                LOGGER.info("[SearchService] search path=indexed query='{}' results={} elapsedMs={}", summarizeQuery(query), results.size(), elapsedMs);
                 return results;
             } catch (Exception ex) {
                 INDEX_CACHE.remove(rootPath);
-                System.err.println("[SearchService] Indexed query failed, using scan fallback: " + ex.getMessage());
+                LOGGER.warn("[SearchService] Indexed query failed, using scan fallback: {}", ex.getMessage());
             }
         }
 
         List<SearchMatch> results = searchParallel(query, maxResults);
         long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
-        System.err.println("[SearchService] search path=parallel-scan query='" + summarizeQuery(query)
-                + "' results=" + results.size() + " elapsedMs=" + elapsedMs);
+        LOGGER.info("[SearchService] search path=parallel-scan query='{}' results={} elapsedMs={}", summarizeQuery(query), results.size(), elapsedMs);
         return results;
     }
 
