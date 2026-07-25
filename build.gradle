@@ -20,7 +20,7 @@ dependencies {
     implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j:1.0.0'
     implementation 'com.vladsch.flexmark:flexmark-all:0.64.8'
     implementation "de.marhali:json5-java:3.0.0"
-    implementation 'org.eclipse.jgit:org.eclipse.jgit:7.6.0.202603022253-r'
+    implementation 'org.eclipse.jgit:org.eclipse.jgit:7.7.1.202607240634-r'
     implementation 'org.slf4j:slf4j-api:2.0.18'
     implementation 'ch.qos.logback:logback-classic:1.5.32'
 
