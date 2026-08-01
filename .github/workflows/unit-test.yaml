@@ -23,7 +23,7 @@ jobs:
         name: Setup uv
 
       - name: Set up JDK 25
-        uses: actions/setup-java@v5.2.0
+        uses: actions/setup-java@v5.7.0
         with:
           distribution: 'temurin'
           java-version: '25'
